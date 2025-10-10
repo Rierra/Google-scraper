@@ -28,12 +28,14 @@ Thumbs.db
 
 # Project specific
 *.png
-*.html
 errors.txt
+# HTML files (except index.html)
+captcha_page.html
+google_page.html
+google_response.html
+no_results.html
 rankings.db
 captcha_detected.png
 no_results.png
-google_page.html
-google_response.html
 no_results.html
 captcha_page.html
