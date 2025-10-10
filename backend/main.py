@@ -85,11 +85,8 @@ async def get_keywords():
 
 @app.post("/api/check")
 async def check_rankings(data: CheckRequest = CheckRequest()):
-    """Check rankings for one or all keywords"""
+    """Queue keywords for local scraping (visible browser)"""
     logger.info(f"Received check request: {data}")
-    
-    # Get default proxy from environment
-    default_proxy = os.getenv('PROXY_URL')
     
     if data.keyword_id:
         keywords = [kw for kw in db.get_all_keywords() if kw['id'] == data.keyword_id]
@@ -100,38 +97,29 @@ async def check_rankings(data: CheckRequest = CheckRequest()):
         logger.warning("No keywords found to check")
         raise HTTPException(status_code=404, detail="No keywords found")
     
-    logger.info(f"Checking {len(keywords)} keyword(s)...")
-    results = []
+    logger.info(f"Queuing {len(keywords)} keyword(s) for local processing...")
     
-    for i, kw in enumerate(keywords, 1):
-        logger.info(f"[{i}/{len(keywords)}] Processing keyword: '{kw['keyword']}'")
-        
-        # Use keyword's proxy if set, otherwise use default from .env
-        proxy = kw.get('proxy') or default_proxy
-        if proxy:
-            logger.info(f"Using proxy for this request")
-        
-        scraper = GoogleRankScraper(proxy=proxy)
-        position = await scraper.get_ranking(kw['keyword'], kw['url'])
-        
-        logger.info(f"Result for '{kw['keyword']}': Position = {position}")
-        
-        db.add_position_check(kw['id'], position)
-        
-        results.append({
-            "keyword_id": kw['id'],
-            "keyword": kw['keyword'],
-            "position": position,
-            "status": "found" if position else "not_in_top_30"
-        })
-        
-        # Add delay between checks to avoid rate limiting
-        if i < len(keywords):  # Don't delay after the last one
-            logger.info("Waiting 3 seconds before next check...")
-            await asyncio.sleep(3)
+    # Return keywords that need to be scraped locally
+    return {
+        "keywords": keywords,
+        "message": "Keywords queued for local processing with visible browser",
+        "status": "queued",
+        "total_keywords": len(keywords)
+    }
+
+@app.post("/api/update-position")
+async def update_position(data: dict):
+    """Update position from local scraper"""
+    keyword_id = data.get('keyword_id')
+    position = data.get('position')
     
-    logger.info(f"Completed all checks. Total: {len(results)}")
-    return {"results": results}
+    if not keyword_id:
+        raise HTTPException(status_code=400, detail="keyword_id is required")
+    
+    db.add_position_check(keyword_id, position)
+    logger.info(f"Updated position for keyword {keyword_id}: {position}")
+    
+    return {"status": "updated", "keyword_id": keyword_id, "position": position}
 
 @app.get("/api/history/{keyword_id}")
 async def get_history(keyword_id: int):

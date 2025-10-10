@@ -77,13 +77,38 @@ const RankTrackerDashboard = () => {
 
       if (!response.ok) throw new Error('Failed to check rankings');
       
-      await fetchKeywords();
+      const result = await response.json();
+      
+      // Show message about local processing
+      if (result.status === 'queued') {
+        alert(`✅ Scraping started! ${result.total_keywords} keyword(s) queued for local processing with visible browser.\n\nResults will appear automatically when your local scraper processes them.`);
+        
+        // Start polling for results
+        startPollingForResults();
+      }
+      
     } catch (err) {
       setError(err.message);
       console.error('Error checking rankings:', err);
     } finally {
       setIsChecking(false);
     }
+  };
+
+  const startPollingForResults = () => {
+    // Poll every 10 seconds for updated results
+    const pollInterval = setInterval(async () => {
+      try {
+        await fetchKeywords();
+      } catch (err) {
+        console.error('Error polling for results:', err);
+      }
+    }, 10000);
+
+    // Stop polling after 5 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval);
+    }, 300000);
   };
 
   const handleDelete = async (id) => {
@@ -319,7 +344,7 @@ const RankTrackerDashboard = () => {
 
         <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-800">
-            <strong>Note:</strong> This tracks positions 1-30 in Google search results. Rankings are checked using headless browser automation with your configured proxies. Checking all keywords may take several minutes.
+            <strong>Note:</strong> This tracks positions 1-30 in Google search results. When you click "Check All", keywords are queued for processing on your local PC with visible browser. Results will appear automatically when scraping completes.
           </p>
         </div>
       </div>
