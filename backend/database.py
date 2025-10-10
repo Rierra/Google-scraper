@@ -8,6 +8,12 @@ class Database:
     def __init__(self, db_path=None):
         # Use environment variable or default
         self.db_path = db_path or os.getenv('DATABASE_PATH', 'rankings.db')
+        
+        # Ensure directory exists for database
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        
         self.init_db()
     
     @contextmanager

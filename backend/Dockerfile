@@ -32,7 +32,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create directory for database
-RUN mkdir -p /app/data
+RUN mkdir -p /app/data && chmod 755 /app/data
 
 # Set environment variables
 ENV PYTHONPATH=/app
