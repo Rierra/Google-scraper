@@ -498,8 +498,22 @@ class GoogleRankScraper:
         finally:
             if driver:
                 logger.info("Closing browser...")
-                driver.quit()
-                logger.info("Browser closed")
+                try:
+                    # Try to quit gracefully
+                    driver.quit()
+                    logger.info("Browser closed")
+                except Exception as e:
+                    logger.warning(f"Error during browser cleanup: {e}")
+                    try:
+                        # Force close if graceful quit fails
+                        driver.close()
+                    except:
+                        pass
+                finally:
+                    # Small delay to ensure cleanup completes
+                    time.sleep(0.5)
+                    # Ensure driver reference is cleared
+                    driver = None
             
             # Cleanup proxy extension
             if self.proxy_extension_path and os.path.exists(self.proxy_extension_path):

@@ -201,50 +201,54 @@ const RankTrackerDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 p-6">
+    <div className="min-h-screen bg-gray-900 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Rank Tracker</h1>
-          <p className="text-gray-300">Track your pages in Google's top 30 results</p>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Rank Tracker</h1>
+          <p className="text-sm sm:text-base text-gray-300">Track your pages in Google's top 30 results</p>
         </div>
 
         {error && (
-          <div className="mb-6 bg-red-900/20 border border-red-500/30 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={20} />
-            <div>
-              <p className="text-red-300 font-medium">Error</p>
-              <p className="text-red-200 text-sm">{error}</p>
+          <div className="mb-4 sm:mb-6 bg-red-900/20 border border-red-500/30 rounded-lg p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+            <AlertCircle className="text-red-400 flex-shrink-0 mt-0.5" size={18} />
+            <div className="min-w-0">
+              <p className="text-red-300 font-medium text-sm">Error</p>
+              <p className="text-red-200 text-xs sm:text-sm break-words">{error}</p>
             </div>
           </div>
         )}
 
-        <div className="bg-gray-800 rounded-lg shadow-sm p-4 mb-6 flex items-center justify-between border border-gray-700">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowAddForm(!showAddForm)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              <Plus size={20} />
-              Add Keyword
-            </button>
-            <button
-              onClick={handleCheckRankings}
-              disabled={isChecking || keywords.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-600"
-            >
-              <RefreshCw size={20} className={isChecking ? 'animate-spin' : ''} />
-              {isChecking ? 'Checking...' : 'Check All'}
-            </button>
-          </div>
-          <div className="text-sm text-gray-300">
-            Tracking {keywords.length} keyword{keywords.length !== 1 ? 's' : ''}
+        <div className="bg-gray-800 rounded-lg shadow-sm p-3 sm:p-4 mb-4 sm:mb-6 border border-gray-700">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
+              <button
+                onClick={() => setShowAddForm(!showAddForm)}
+                className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
+              >
+                <Plus size={18} />
+                <span className="hidden sm:inline">Add Keyword</span>
+                <span className="sm:hidden">Add</span>
+              </button>
+              <button
+                onClick={handleCheckRankings}
+                disabled={isChecking || keywords.length === 0}
+                className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-gray-600 text-sm sm:text-base"
+              >
+                <RefreshCw size={18} className={isChecking ? 'animate-spin' : ''} />
+                <span className="hidden sm:inline">{isChecking ? 'Checking...' : 'Check All'}</span>
+                <span className="sm:hidden">{isChecking ? 'Check...' : 'Check All'}</span>
+              </button>
+            </div>
+            <div className="text-xs sm:text-sm text-gray-300 text-center sm:text-right">
+              Tracking {keywords.length} keyword{keywords.length !== 1 ? 's' : ''}
+            </div>
           </div>
         </div>
 
         {showAddForm && (
-          <div className="bg-gray-800 rounded-lg shadow-sm p-6 mb-6 border border-gray-700">
-            <h3 className="text-lg font-semibold mb-4 text-white">Add New Tracking</h3>
-            <div className="space-y-4">
+          <div className="bg-gray-800 rounded-lg shadow-sm p-4 sm:p-6 mb-4 sm:mb-6 border border-gray-700">
+            <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 text-white">Add New Tracking</h3>
+            <div className="space-y-3 sm:space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
                   Keyword *
@@ -254,7 +258,7 @@ const RankTrackerDashboard = () => {
                   value={newTrack.keyword}
                   onChange={(e) => setNewTrack({...newTrack, keyword: e.target.value})}
                   placeholder="e.g., best productivity tools 2025"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400"
+                  className="w-full px-3 sm:px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 text-sm sm:text-base"
                 />
               </div>
               <div>
@@ -266,7 +270,7 @@ const RankTrackerDashboard = () => {
                   value={newTrack.url}
                   onChange={(e) => setNewTrack({...newTrack, url: e.target.value})}
                   placeholder="https://example.com/your-page"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400"
+                  className="w-full px-3 sm:px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 text-sm sm:text-base"
                 />
               </div>
               <div>
@@ -278,13 +282,13 @@ const RankTrackerDashboard = () => {
                   value={newTrack.proxy}
                   onChange={(e) => setNewTrack({...newTrack, proxy: e.target.value})}
                   placeholder="http://user:pass@proxy.com:port"
-                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400"
+                  className="w-full px-3 sm:px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 text-sm sm:text-base"
                 />
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                 <button
                   onClick={handleAddTrack}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-4 sm:px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
                 >
                   Add Tracking
                 </button>
@@ -293,7 +297,7 @@ const RankTrackerDashboard = () => {
                     setShowAddForm(false);
                     setError(null);
                   }}
-                  className="px-6 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors border border-gray-600"
+                  className="px-4 sm:px-6 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors border border-gray-600 text-sm sm:text-base"
                 >
                   Cancel
                 </button>
@@ -304,25 +308,99 @@ const RankTrackerDashboard = () => {
 
         <div className="bg-gray-800 rounded-lg shadow-sm overflow-hidden border border-gray-700">
           {loading ? (
-            <div className="text-center py-12">
-              <RefreshCw className="animate-spin mx-auto text-gray-400 mb-4" size={48} />
-              <p className="text-gray-300">Loading keywords...</p>
+            <div className="text-center py-8 sm:py-12">
+              <RefreshCw className="animate-spin mx-auto text-gray-400 mb-3 sm:mb-4" size={40} />
+              <p className="text-gray-300 text-sm sm:text-base">Loading keywords...</p>
             </div>
           ) : keywords.length === 0 ? (
-            <div className="text-center py-12">
-              <Search size={48} className="mx-auto text-gray-600 mb-4" />
-              <h3 className="text-lg font-medium text-white mb-2">No keywords tracked yet</h3>
-              <p className="text-gray-400 mb-4">Add your first keyword to start tracking rankings</p>
+            <div className="text-center py-8 sm:py-12">
+              <Search size={40} className="mx-auto text-gray-600 mb-3 sm:mb-4" />
+              <h3 className="text-base sm:text-lg font-medium text-white mb-2">No keywords tracked yet</h3>
+              <p className="text-gray-400 mb-4 text-sm sm:text-base px-4">Add your first keyword to start tracking rankings</p>
               <button
                 onClick={() => setShowAddForm(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm sm:text-base"
               >
-                <Plus size={20} />
+                <Plus size={18} />
                 Add Keyword
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="block sm:hidden">
+              {/* Mobile card view */}
+              <div className="divide-y divide-gray-700">
+                {keywords.map((item) => (
+                  <div key={item.id} className="p-4 hover:bg-gray-700/50 transition-colors">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Search size={16} className="text-gray-500 flex-shrink-0" />
+                        <span className="text-sm font-medium text-white truncate">
+                          {item.keyword}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2">
+                        <button
+                          onClick={() => handleCheckSingleKeyword(item.id)}
+                          disabled={checkingKeywords.has(item.id)}
+                          className="text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Check this keyword"
+                        >
+                          <RefreshCw size={16} className={checkingKeywords.has(item.id) ? 'animate-spin' : ''} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(item.id)}
+                          className="text-red-400 hover:text-red-300 transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div>
+                        <a
+                          href={item.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-400 hover:text-blue-300 break-all transition-colors"
+                        >
+                          {item.url}
+                        </a>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1">
+                          {item.position ? (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-900/50 text-blue-300 border border-blue-700">
+                              #{item.position}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-500">Not checked</span>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 text-xs text-gray-400">
+                          <div className="flex items-center gap-1">
+                            <Calendar size={12} />
+                            <span>{formatDateShort(item.created_at)}</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-1 text-xs text-gray-400">
+                        <Clock size={12} />
+                        <span>{formatDate(item.checked_at)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            
+            <div className="hidden sm:block overflow-x-auto">
+              {/* Desktop table view */}
               <table className="w-full">
                 <thead className="bg-gray-700 border-b border-gray-600">
                   <tr>
@@ -416,11 +494,12 @@ const RankTrackerDashboard = () => {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
 
-        <div className="mt-6 bg-blue-900/20 border border-blue-700/30 rounded-lg p-4">
-          <p className="text-sm text-blue-300">
+        <div className="mt-4 sm:mt-6 bg-blue-900/20 border border-blue-700/30 rounded-lg p-3 sm:p-4">
+          <p className="text-xs sm:text-sm text-blue-300 leading-relaxed">
             <strong>Note:</strong> This tracks positions 1-30 in Google search results. When you click "Check All" or individual check buttons, keywords are queued for processing on your local PC with visible browser. Results will appear automatically when scraping completes.
           </p>
         </div>
