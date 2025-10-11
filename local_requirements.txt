@@ -1,0 +1,4 @@
+# Local processor requirements
+requests==2.31.0
+undetected-chromedriver==3.5.4
+selenium==4.15.2
