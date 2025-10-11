@@ -9,38 +9,28 @@ import asyncio
 import time
 import sys
 import os
+import warnings
+
+# Suppress the Windows handle warning during cleanup
+warnings.filterwarnings("ignore", category=ResourceWarning)
 
 # Add backend directory to path so we can import scraper
 sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
 
 from scraper import GoogleRankScraper
 
-# Monkey patch to prevent the Windows handle error
+# Monkey patch to suppress Windows handle errors during Chrome cleanup
 import undetected_chromedriver as uc
+_original_quit = uc.Chrome.quit
 
-# Store the original Chrome class
-_original_chrome = uc.Chrome
+def patched_quit(self):
+    """Patched quit method that suppresses Windows handle errors"""
+    try:
+        _original_quit(self)
+    except OSError:
+        pass  # Ignore Windows handle errors during cleanup
 
-class SafeChrome(_original_chrome):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._already_quit = False
-    
-    def quit(self):
-        if not self._already_quit:
-            try:
-                super().quit()
-            except Exception:
-                pass  # Ignore errors during quit
-            finally:
-                self._already_quit = True
-    
-    def __del__(self):
-        # Prevent the __del__ method from calling quit again
-        pass
-
-# Replace the Chrome class with our safe version
-uc.Chrome = SafeChrome
+uc.Chrome.quit = patched_quit
 
 class LocalRankProcessor:
     def __init__(self, api_url):
@@ -115,44 +105,55 @@ class LocalRankProcessor:
             
         except Exception as e:
             print(f"❌ Error processing keyword: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
-    async def run_once(self):
-        """Run once to process all pending keywords"""
-        print(f"🚀 Starting local rank processor (ONE-TIME RUN)...")
+    async def run_continuous(self, check_interval=10):
+        """Run continuously, waiting for scraping triggers from website"""
+        print(f"🚀 Starting local rank processor (CONTINUOUS MODE)...")
         print(f"📡 Connected to: {self.api_url}")
         print(f"🌐 Using VISIBLE browser for scraping (Chrome will open on your PC)")
-        print(f"💡 Your boss can now use: https://google-scraper-frontend.onrender.com")
+        print(f"💡 You can add keywords via: https://google-scraper-frontend.onrender.com")
+        print(f"⏱️  Checking for new requests every {check_interval} seconds")
+        print(f"🔄 Script will stay running - close with Ctrl+C to stop")
         print("-" * 60)
         
-        try:
-            # Get keywords from Render API
-            keywords = self.get_pending_keywords()
-            
-            if keywords:
-                print(f"\n📋 Found {len(keywords)} keyword(s) to process")
+        while True:
+            try:
+                # Get keywords from Render API
+                keywords = self.get_pending_keywords()
                 
-                # Process each keyword
-                for i, keyword_data in enumerate(keywords, 1):
-                    print(f"\n[{i}/{len(keywords)}] Processing keyword...")
-                    await self.process_keyword(keyword_data)
+                if keywords:
+                    print(f"\n📋 Found {len(keywords)} keyword(s) to process")
                     
-                    # Delay between keywords to avoid rate limiting
-                    if i < len(keywords):
-                        print("⏳ Waiting 5 seconds before next keyword...")
-                        await asyncio.sleep(5)
+                    # Process each keyword
+                    for i, keyword_data in enumerate(keywords, 1):
+                        print(f"\n[{i}/{len(keywords)}] Processing keyword...")
+                        await self.process_keyword(keyword_data)
+                        
+                        # Delay between keywords to avoid rate limiting
+                        if i < len(keywords):
+                            print("⏳ Waiting 5 seconds before next keyword...")
+                            await asyncio.sleep(5)
+                    
+                    print(f"\n✅ Completed batch of {len(keywords)} keywords")
+                    print(f"🎉 Results sent to backend!")
+                    print(f"💤 Waiting for next trigger...")
+                else:
+                    print("💤 No keywords to process, waiting...")
                 
-                print(f"\n✅ Completed batch of {len(keywords)} keywords")
-                print(f"🎉 All done! Results sent to backend.")
-            else:
-                print("💤 No keywords to process")
-                print("💡 Add keywords via the frontend first!")
+                # Wait before next check
+                print(f"⏰ Checking again in {check_interval} seconds...")
+                await asyncio.sleep(check_interval)
                 
-        except Exception as e:
-            print(f"❌ Error processing keywords: {e}")
-            return False
-        
-        return True
+            except KeyboardInterrupt:
+                print("\n🛑 Stopping processor...")
+                break
+            except Exception as e:
+                print(f"❌ Error in main loop: {e}")
+                print("⏳ Waiting 30 seconds before retry...")
+                await asyncio.sleep(30)
 
 def main():
     """Main function to run the local processor"""
@@ -176,19 +177,16 @@ def main():
         keywords = processor.get_pending_keywords()
         print("✅ Connection successful!")
         
-        # Run once to process all keywords
-        success = asyncio.run(processor.run_once())
-        
-        if success:
-            print("\n🎉 Processing complete!")
-        else:
-            print("\n⚠️  Processing failed!")
+        # Run continuously, waiting for triggers
+        asyncio.run(processor.run_continuous(check_interval=10))
             
     except KeyboardInterrupt:
         print("\n🛑 Stopped by user")
     except Exception as e:
         print(f"❌ Failed to start: {e}")
         print("Make sure your backend is deployed and running!")
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
