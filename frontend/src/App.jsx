@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle } from 'lucide-react';
 
-// CONFIGURE THIS: Replace with your actual Render backend URL
-const API_URL = 'https://your-backend-app-name.onrender.com';
+// Backend deployed on Render
+const API_URL = 'https://google-scraper-1.onrender.com';
 
 const RankTrackerDashboard = () => {
   const [keywords, setKeywords] = useState([]);
