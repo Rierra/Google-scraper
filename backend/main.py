@@ -29,7 +29,7 @@ from database import Database
 app = FastAPI(title="Google Rank Tracker API")
 
 # CORS middleware for frontend
-allowed_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+allowed_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000,https://google-scraper-frontend.onrender.com').split(',')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
