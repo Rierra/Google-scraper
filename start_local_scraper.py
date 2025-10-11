@@ -15,6 +15,33 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'backend'))
 
 from scraper import GoogleRankScraper
 
+# Monkey patch to prevent the Windows handle error
+import undetected_chromedriver as uc
+
+# Store the original Chrome class
+_original_chrome = uc.Chrome
+
+class SafeChrome(_original_chrome):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._already_quit = False
+    
+    def quit(self):
+        if not self._already_quit:
+            try:
+                super().quit()
+            except Exception:
+                pass  # Ignore errors during quit
+            finally:
+                self._already_quit = True
+    
+    def __del__(self):
+        # Prevent the __del__ method from calling quit again
+        pass
+
+# Replace the Chrome class with our safe version
+uc.Chrome = SafeChrome
+
 class LocalRankProcessor:
     def __init__(self, api_url):
         """
@@ -80,6 +107,9 @@ class LocalRankProcessor:
                 print(f"🎯 Found at position: {position}")
             else:
                 print(f"❌ Not found in top 30")
+            
+            # Clear scraper reference to help with cleanup
+            del scraper
             
             return success
             
