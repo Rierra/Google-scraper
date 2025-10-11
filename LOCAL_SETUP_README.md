@@ -20,9 +20,9 @@ start_scraper.bat
 
 - **Connects to your deployed backend**: `https://google-scraper-1.onrender.com`
 - **Runs visible browser**: Chrome will open on your PC for scraping
-- **Processes keywords**: Automatically scrapes keywords queued by your boss
+- **Processes keywords**: Scrapes all pending keywords in one run
 - **Updates results**: Sends results back to the deployed backend
-- **Runs continuously**: Checks for new keywords every 60 seconds
+- **Runs once**: Processes all keywords and exits (no continuous polling)
 
 ## 🌐 Your URLs
 
@@ -33,10 +33,11 @@ start_scraper.bat
 
 1. **Your boss opens the frontend** and adds keywords
 2. **Boss clicks "Check All"** → backend queues the tasks
-3. **Your local scraper** (this script) connects and processes the tasks
+3. **You run the local scraper** when you want to check rankings (once per day)
 4. **Chrome opens on your PC** and scrapes Google search results
 5. **Results are sent back** to the backend automatically
 6. **Frontend updates** with the new rankings
+7. **Script exits** after processing all keywords
 
 ## ⚙️ Manual Setup (if needed)
 
@@ -52,8 +53,8 @@ python start_local_scraper.py
 
 ## 🛑 Stopping the Scraper
 
-- Press `Ctrl+C` in the terminal to stop
-- Or close the terminal window
+- The script runs once and exits automatically
+- Press `Ctrl+C` if you need to stop mid-processing
 
 ## 🔧 Troubleshooting
 
@@ -64,6 +65,7 @@ python start_local_scraper.py
 ## 📝 Notes
 
 - The scraper runs with a **visible browser** (headless=False)
-- It processes keywords every **60 seconds**
+- It processes **all keywords once** and then exits
 - **5-second delay** between keywords to avoid rate limiting
 - Results are automatically sent to your deployed backend
+- **Perfect for daily rank checks** - run once per day manually

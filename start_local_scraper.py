@@ -87,48 +87,42 @@ class LocalRankProcessor:
             print(f"❌ Error processing keyword: {e}")
             return False
     
-    async def run_continuous(self, check_interval=60):
-        """Run continuous processing of keywords"""
-        print(f"🚀 Starting local rank processor...")
+    async def run_once(self):
+        """Run once to process all pending keywords"""
+        print(f"🚀 Starting local rank processor (ONE-TIME RUN)...")
         print(f"📡 Connected to: {self.api_url}")
-        print(f"⏱️  Check interval: {check_interval} seconds")
         print(f"🌐 Using VISIBLE browser for scraping (Chrome will open on your PC)")
         print(f"💡 Your boss can now use: https://google-scraper-frontend.onrender.com")
         print("-" * 60)
         
-        while True:
-            try:
-                # Get keywords from Render API
-                keywords = self.get_pending_keywords()
+        try:
+            # Get keywords from Render API
+            keywords = self.get_pending_keywords()
+            
+            if keywords:
+                print(f"\n📋 Found {len(keywords)} keyword(s) to process")
                 
-                if keywords:
-                    print(f"\n📋 Found {len(keywords)} keyword(s) to process")
+                # Process each keyword
+                for i, keyword_data in enumerate(keywords, 1):
+                    print(f"\n[{i}/{len(keywords)}] Processing keyword...")
+                    await self.process_keyword(keyword_data)
                     
-                    # Process each keyword
-                    for i, keyword_data in enumerate(keywords, 1):
-                        print(f"\n[{i}/{len(keywords)}] Processing keyword...")
-                        await self.process_keyword(keyword_data)
-                        
-                        # Delay between keywords to avoid rate limiting
-                        if i < len(keywords):
-                            print("⏳ Waiting 5 seconds before next keyword...")
-                            await asyncio.sleep(5)
-                    
-                    print(f"\n✅ Completed batch of {len(keywords)} keywords")
-                else:
-                    print("💤 No keywords to process, waiting...")
+                    # Delay between keywords to avoid rate limiting
+                    if i < len(keywords):
+                        print("⏳ Waiting 5 seconds before next keyword...")
+                        await asyncio.sleep(5)
                 
-                # Wait before next check
-                print(f"⏰ Waiting {check_interval} seconds before next check...")
-                await asyncio.sleep(check_interval)
+                print(f"\n✅ Completed batch of {len(keywords)} keywords")
+                print(f"🎉 All done! Results sent to backend.")
+            else:
+                print("💤 No keywords to process")
+                print("💡 Add keywords via the frontend first!")
                 
-            except KeyboardInterrupt:
-                print("\n🛑 Stopping processor...")
-                break
-            except Exception as e:
-                print(f"❌ Error in main loop: {e}")
-                print("⏳ Waiting 30 seconds before retry...")
-                await asyncio.sleep(30)
+        except Exception as e:
+            print(f"❌ Error processing keywords: {e}")
+            return False
+        
+        return True
 
 def main():
     """Main function to run the local processor"""
@@ -152,10 +146,16 @@ def main():
         keywords = processor.get_pending_keywords()
         print("✅ Connection successful!")
         
-        # Run continuous processing
-        asyncio.run(processor.run_continuous(check_interval=60))
+        # Run once to process all keywords
+        success = asyncio.run(processor.run_once())
+        
+        if success:
+            print("\n🎉 Processing complete!")
+        else:
+            print("\n⚠️  Processing failed!")
+            
     except KeyboardInterrupt:
-        print("\n👋 Goodbye!")
+        print("\n🛑 Stopped by user")
     except Exception as e:
         print(f"❌ Failed to start: {e}")
         print("Make sure your backend is deployed and running!")
