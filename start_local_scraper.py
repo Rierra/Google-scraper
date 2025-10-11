@@ -68,8 +68,9 @@ class LocalRankProcessor:
         print(f"\n🔍 Processing: '{keyword}' for URL: {url}")
         
         try:
-            # Use your existing scraper with visible browser (headless=False)
-            scraper = GoogleRankScraper(proxy=proxy, headless=False)
+            # Use your existing scraper with visible browser
+            # The scraper will use visible mode since CHROME_HEADLESS is not set to 'true'
+            scraper = GoogleRankScraper(proxy=proxy)
             position = await scraper.get_ranking(keyword, url)
             
             # Send result back to Render
@@ -91,7 +92,7 @@ class LocalRankProcessor:
         print(f"🚀 Starting local rank processor...")
         print(f"📡 Connected to: {self.api_url}")
         print(f"⏱️  Check interval: {check_interval} seconds")
-        print(f"🌐 Using VISIBLE browser for scraping")
+        print(f"🌐 Using VISIBLE browser for scraping (Chrome will open on your PC)")
         print(f"💡 Your boss can now use: https://google-scraper-frontend.onrender.com")
         print("-" * 60)
         
