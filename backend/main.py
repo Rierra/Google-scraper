@@ -83,9 +83,24 @@ async def get_keywords():
     keywords = db.get_all_keywords()
     return {"keywords": keywords}
 
+# Global variable to store keywords that need processing
+pending_keywords = []
+
+@app.get("/api/check")
+async def get_pending_keywords():
+    """Get keywords that need to be processed by local scraper"""
+    global pending_keywords
+    if pending_keywords:
+        keywords = pending_keywords.copy()
+        pending_keywords.clear()  # Clear after returning
+        return {"keywords": keywords}
+    else:
+        raise HTTPException(status_code=404, detail="No keywords pending")
+
 @app.post("/api/check")
 async def check_rankings(data: CheckRequest = CheckRequest()):
     """Queue keywords for local scraping (visible browser)"""
+    global pending_keywords
     logger.info(f"Received check request: {data}")
     
     if data.keyword_id:
@@ -97,11 +112,12 @@ async def check_rankings(data: CheckRequest = CheckRequest()):
         logger.warning("No keywords found to check")
         raise HTTPException(status_code=404, detail="No keywords found")
     
-    logger.info(f"Queuing {len(keywords)} keyword(s) for local processing...")
+    # Add keywords to pending list for local scraper to pick up
+    pending_keywords = keywords
     
-    # Return keywords that need to be scraped locally
+    logger.info(f"Queued {len(keywords)} keyword(s) for local processing...")
+    
     return {
-        "keywords": keywords,
         "message": "Keywords queued for local processing with visible browser",
         "status": "queued",
         "total_keywords": len(keywords)

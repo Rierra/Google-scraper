@@ -53,6 +53,16 @@ class Database:
                 )
             ''')
             
+            # Processing queue table
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS processing_queue (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    keyword_id INTEGER NOT NULL,
+                    queued_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (keyword_id) REFERENCES keywords(id) ON DELETE CASCADE
+                )
+            ''')
+            
             conn.commit()
     
     def add_keyword(self, keyword, url, proxy=None):

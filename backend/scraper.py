@@ -16,6 +16,35 @@ class GoogleRankScraper:
     def __init__(self, proxy=None):
         self.proxy = proxy
         self.proxy_extension_path = None
+    
+    def _create_chrome_options(self):
+        """Create a fresh ChromeOptions object for each scraping session"""
+        options = uc.ChromeOptions()
+        
+        # Use headless mode in production if configured
+        if os.getenv('CHROME_HEADLESS', 'false').lower() == 'true':
+            options.add_argument('--headless=new')
+        
+        # Essential arguments for deployment
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_argument('--window-size=1920,1080')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--remote-debugging-port=9222')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-plugins')
+        options.add_argument('--disable-images')
+        
+        # Handle proxy with extension for authentication
+        if self.proxy:
+            logger.info("Setting up proxy with authentication extension...")
+            self.proxy_extension_path = self._create_proxy_extension(self.proxy)
+            if self.proxy_extension_path:
+                options.add_argument(f'--load-extension={self.proxy_extension_path}')
+                logger.info("Proxy extension loaded")
+        
+        return options
         
     async def _handle_captcha(self, driver):
         """
@@ -234,32 +263,8 @@ class GoogleRankScraper:
         
         driver = None
         try:
-            # Setup undetected Chrome
-            options = uc.ChromeOptions()
-            
-            # Use headless mode in production if configured
-            if os.getenv('CHROME_HEADLESS', 'false').lower() == 'true':
-                options.add_argument('--headless=new')
-            
-            # Essential arguments for deployment
-            options.add_argument('--no-sandbox')
-            options.add_argument('--disable-dev-shm-usage')
-            options.add_argument('--disable-blink-features=AutomationControlled')
-            options.add_argument('--window-size=1920,1080')
-            options.add_argument('--disable-gpu')
-            options.add_argument('--remote-debugging-port=9222')
-            options.add_argument('--disable-extensions')
-            options.add_argument('--disable-plugins')
-            options.add_argument('--disable-images')
-            # options.add_argument('--disable-javascript')  # We need JS for Google, so keeping enabled
-            
-            # Handle proxy with extension for authentication
-            if self.proxy:
-                logger.info("Setting up proxy with authentication extension...")
-                self.proxy_extension_path = self._create_proxy_extension(self.proxy)
-                if self.proxy_extension_path:
-                    options.add_argument(f'--load-extension={self.proxy_extension_path}')
-                    logger.info("Proxy extension loaded")
+            # Create fresh options for this scraping session
+            options = self._create_chrome_options()
             
             logger.info("Starting undetected Chrome browser...")
             driver = uc.Chrome(options=options, version_main=None)
@@ -322,17 +327,20 @@ class GoogleRankScraper:
             # Try multiple selectors for result containers
             result_containers = []
             container_selectors = [
-                'div.g',  # Standard desktop results
+                'div.g:not(.related-question-pair):not(.kp-blk)',  # Standard desktop results, excluding PAA and knowledge panels
                 'div[data-sokoban-container]',  # Alternative container
-                'div.Gx5Zad',  # Mobile-style results sometimes appear
+                'div.Gx5Zad.fP1Qef',  # Mobile-style results
+                'div[jscontroller][data-hveid]',  # Another common container
             ]
             
             for selector in container_selectors:
                 try:
                     containers = driver.find_elements(By.CSS_SELECTOR, selector)
-                    if containers:
-                        result_containers = containers
-                        logger.info(f"Found {len(containers)} result containers with selector: {selector}")
+                    # Filter out empty containers
+                    valid_containers = [c for c in containers if c.text.strip()]
+                    if valid_containers:
+                        result_containers = valid_containers
+                        logger.info(f"Found {len(valid_containers)} result containers with selector: {selector}")
                         break
                 except Exception as e:
                     logger.debug(f"Selector {selector} failed: {e}")

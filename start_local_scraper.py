@@ -46,10 +46,13 @@ class LocalRankProcessor:
     def get_pending_keywords(self):
         """Get keywords that need to be scraped from the Render API"""
         try:
-            response = self.session.get(f"{self.api_url}/api/keywords")
+            response = self.session.get(f"{self.api_url}/api/check")
             if response.status_code == 200:
                 data = response.json()
                 return data.get("keywords", [])
+            elif response.status_code == 404:
+                # No keywords to check - this is normal
+                return []
             else:
                 print(f"❌ Error fetching keywords: {response.status_code}")
                 return []
