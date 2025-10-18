@@ -212,12 +212,6 @@ const RankTrackerDashboard = () => {
     });
   };
 
-  const getCountryName = (code) => {
-    if (!code) return 'Global';
-    const country = countryList.find(c => c.code === code);
-    return country ? country.name : code.toUpperCase();
-  };
-
   const formatDateShort = (dateString) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
