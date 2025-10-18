@@ -4,6 +4,21 @@ import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, Alert
 // Backend deployed on Render
 const API_URL = 'https://google-scraper-1.onrender.com';
 
+const countryList = [
+  { code: '', name: 'Global / Auto' },
+  { code: 'us', name: 'United States' },
+  { code: 'ca', name: 'Canada' },
+  { code: 'gb', name: 'United Kingdom' },
+  { code: 'au', name: 'Australia' },
+  { code: 'de', name: 'Germany' },
+  { code: 'fr', name: 'France' },
+  { code: 'es', name: 'Spain' },
+  { code: 'it', name: 'Italy' },
+  { code: 'jp', name: 'Japan' },
+  { code: 'br', name: 'Brazil' },
+  { code: 'in', name: 'India' },
+];
+
 const RankTrackerDashboard = () => {
   const [keywords, setKeywords] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -14,6 +29,7 @@ const RankTrackerDashboard = () => {
   const [newTrack, setNewTrack] = useState({
     keyword: '',
     url: '',
+    country: '',
     proxy: ''
   });
 
@@ -57,7 +73,7 @@ const RankTrackerDashboard = () => {
         throw new Error(errorData.detail || 'Failed to add keyword');
       }
 
-      setNewTrack({ keyword: '', url: '', proxy: '' });
+      setNewTrack({ keyword: '', url: '', country: '', proxy: '' });
       setShowAddForm(false);
       await fetchKeywords();
     } catch (err) {
@@ -176,6 +192,12 @@ const RankTrackerDashboard = () => {
     return 'text-gray-400';
   };
 
+  const getCountryName = (code) => {
+    if (!code) return 'Global';
+    const country = countryList.find(c => c.code === code);
+    return country ? country.name : code.toUpperCase();
+  };
+
   const formatDate = (dateString) => {
     if (!dateString) return 'Never';
     const date = new Date(dateString);
@@ -188,6 +210,12 @@ const RankTrackerDashboard = () => {
       second: '2-digit',
       hour12: true
     });
+  };
+
+  const getCountryName = (code) => {
+    if (!code) return 'Global';
+    const country = countryList.find(c => c.code === code);
+    return country ? country.name : code.toUpperCase();
   };
 
   const formatDateShort = (dateString) => {
@@ -275,6 +303,18 @@ const RankTrackerDashboard = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Country
+                </label>
+                <select
+                  value={newTrack.country}
+                  onChange={(e) => setNewTrack({...newTrack, country: e.target.value})}
+                  className="w-full px-3 sm:px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 text-sm sm:text-base"
+                >
+                  {countryList.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
                   Proxy (optional)
                 </label>
                 <input
@@ -335,9 +375,14 @@ const RankTrackerDashboard = () => {
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         <Search size={16} className="text-gray-500 flex-shrink-0" />
-                        <span className="text-sm font-medium text-white truncate">
-                          {item.keyword}
-                        </span>
+                        <div className="flex-grow min-w-0">
+                          <span className="text-sm font-medium text-white truncate block">
+                            {item.keyword}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {getCountryName(item.country)}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex items-center gap-2 ml-2">
                         <button
@@ -410,6 +455,9 @@ const RankTrackerDashboard = () => {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       URL
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Country
+                    </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Position
                     </th>
@@ -444,6 +492,9 @@ const RankTrackerDashboard = () => {
                         >
                           {item.url}
                         </a>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-gray-300">{getCountryName(item.country)}</span>
                       </td>
                       <td className="px-6 py-4 text-center">
                         {item.position ? (

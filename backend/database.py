@@ -36,9 +36,10 @@ class Database:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     keyword TEXT NOT NULL,
                     url TEXT NOT NULL,
+                    country TEXT,
                     proxy TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(keyword, url)
+                    UNIQUE(keyword, url, country)
                 )
             ''')
             
@@ -65,13 +66,13 @@ class Database:
             
             conn.commit()
     
-    def add_keyword(self, keyword, url, proxy=None):
+    def add_keyword(self, keyword, url, country=None, proxy=None):
         with self.get_conn() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    'INSERT INTO keywords (keyword, url, proxy) VALUES (?, ?, ?)',
-                    (keyword, url, proxy)
+                    'INSERT INTO keywords (keyword, url, country, proxy) VALUES (?, ?, ?, ?)',
+                    (keyword, url, country, proxy)
                 )
                 return cursor.lastrowid
             except sqlite3.IntegrityError:
@@ -81,7 +82,7 @@ class Database:
         with self.get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute('''
-                SELECT k.id, k.keyword, k.url, k.proxy, k.created_at,
+                SELECT k.id, k.keyword, k.url, k.country, k.proxy, k.created_at,
                        h.position, h.checked_at
                 FROM keywords k
                 LEFT JOIN (

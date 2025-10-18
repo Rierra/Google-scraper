@@ -44,12 +44,14 @@ db = Database()
 class KeywordCreate(BaseModel):
     keyword: str
     url: str
+    country: Optional[str] = None
     proxy: Optional[str] = None
 
 class KeywordResponse(BaseModel):
     id: int
     keyword: str
     url: str
+    country: Optional[str]
     proxy: Optional[str]
     position: Optional[int]
     checked_at: Optional[str]
@@ -71,9 +73,9 @@ async def startup_event():
 @app.post("/api/track")
 async def add_tracking(data: KeywordCreate):
     """Add new keyword to track"""
-    keyword_id = db.add_keyword(data.keyword, data.url, data.proxy)
+    keyword_id = db.add_keyword(data.keyword, data.url, data.country, data.proxy)
     if keyword_id is None:
-        raise HTTPException(status_code=400, detail="Keyword already being tracked")
+        raise HTTPException(status_code=400, detail="Keyword with this URL and country is already being tracked")
     
     return {"id": keyword_id, "message": "Keyword added successfully"}
 

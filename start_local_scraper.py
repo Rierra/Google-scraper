@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Pre-configured local scraper for your deployed backend
-Just run this script to start scraping on your PC
+Pre-configured local scraper with PROXY support
 """
 
 import requests
@@ -33,15 +32,17 @@ def patched_quit(self):
 uc.Chrome.quit = patched_quit
 
 class LocalRankProcessor:
-    def __init__(self, api_url):
+    def __init__(self, api_url, proxy=None):
         """
         Initialize the local processor
         
         Args:
             api_url: URL of your deployed Render app
+            proxy: Proxy URL in format: http://username:password@host:port
         """
         self.api_url = api_url.rstrip('/')
         self.session = requests.Session()
+        self.default_proxy = proxy
         
     def get_pending_keywords(self):
         """Get keywords that need to be scraped from the Render API"""
@@ -79,19 +80,29 @@ class LocalRankProcessor:
             return False
     
     async def process_keyword(self, keyword_data):
-        """Process a single keyword with visible browser"""
+        """Process a single keyword with headless browser + proxy"""
         keyword_id = keyword_data['id']
         keyword = keyword_data['keyword']
         url = keyword_data['url']
-        proxy = keyword_data.get('proxy')
+        country = keyword_data.get('country')
+
+        # Use proxy from keyword data if provided, otherwise use default
+        proxy = keyword_data.get('proxy') or self.default_proxy
         
-        print(f"\n🔍 Processing: '{keyword}' for URL: {url}")
+        if country:
+            print(f"\nðŸ” Processing: '{keyword}' for URL: {url} (Country: {country.upper()})")
+        else:
+            print(f"\nðŸ” Processing: '{keyword}' for URL: {url}")
+
+        if proxy:
+            # Hide password in logs
+            proxy_display = proxy.split('@')[1] if '@' in proxy else proxy
+            print(f"ðŸŒ Using proxy: {proxy_display}")
         
         try:
-            # Use your existing scraper with visible browser
-            # The scraper will use visible mode since CHROME_HEADLESS is not set to 'true'
+            # Use scraper in HEADLESS mode with proxy
             scraper = GoogleRankScraper(proxy=proxy)
-            position = await scraper.get_ranking(keyword, url)
+            position = await scraper.get_ranking(keyword, url, country=country)
             
             # Send result back to Render
             success = self.update_position(keyword_id, position)
@@ -116,7 +127,10 @@ class LocalRankProcessor:
         """Run continuously, waiting for scraping triggers from website"""
         print(f"🚀 Starting local rank processor (CONTINUOUS MODE)...")
         print(f"📡 Connected to: {self.api_url}")
-        print(f"🌐 Using VISIBLE browser for scraping (Chrome will open on your PC)")
+        print(f"🔒 Using HEADLESS browser mode")
+        if self.default_proxy:
+            proxy_display = self.default_proxy.split('@')[1] if '@' in self.default_proxy else self.default_proxy
+            print(f"🌐 Default proxy: {proxy_display}")
         print(f"💡 You can add keywords via: https://google-scraper-frontend.onrender.com")
         print(f"⏱️  Checking for new requests every {check_interval} seconds")
         print(f"🔄 Script will stay running - close with Ctrl+C to stop")
@@ -137,8 +151,9 @@ class LocalRankProcessor:
                         
                         # Delay between keywords to avoid rate limiting
                         if i < len(keywords):
-                            print("⏳ Waiting 5 seconds before next keyword...")
-                            await asyncio.sleep(5)
+                            wait_time = random.uniform(8, 15)
+                            print(f"⏳ Waiting {wait_time:.1f} seconds before next keyword...")
+                            await asyncio.sleep(wait_time)
                     
                     print(f"\n✅ Completed batch of {len(keywords)} keywords")
                     print(f"🎉 Results sent to backend!")
@@ -164,15 +179,29 @@ def main():
     # Your deployed backend URL
     api_url = "https://google-scraper-1.onrender.com"
     
+    # ============================================
+    # CONFIGURE YOUR PROXY HERE
+    # ============================================
+    # Format: http://username:password@host:port
+    # Example: http://QD2I98DOSq0h30C6:wifi;;;;@proxy.froxy.com:9000
+    
+    proxy = "http://QD2I98DOSq0h30C6:wifi;;;;@proxy.froxy.com:9000"
+    
+    # If no proxy needed, set to None:
+    # proxy = None
+    
     print("=" * 60)
     print("🎯 GOOGLE RANK TRACKER - LOCAL PROCESSOR")
     print("=" * 60)
     print(f"📡 Backend: {api_url}")
     print(f"🌐 Frontend: https://google-scraper-frontend.onrender.com")
+    if proxy:
+        proxy_display = proxy.split('@')[1] if '@' in proxy else proxy
+        print(f"🔐 Proxy: {proxy_display}")
     print("=" * 60)
     
     # Create and run processor
-    processor = LocalRankProcessor(api_url)
+    processor = LocalRankProcessor(api_url, proxy=proxy)
     
     try:
         # Test connection first
@@ -181,6 +210,7 @@ def main():
         print("✅ Connection successful!")
         
         # Run continuously, waiting for triggers
+        import random
         asyncio.run(processor.run_continuous(check_interval=10))
             
     except KeyboardInterrupt:

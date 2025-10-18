@@ -40,14 +40,18 @@ class LocalRankProcessor:
         keyword_id = keyword_data['id']
         keyword = keyword_data['keyword']
         url = keyword_data['url']
+        country = keyword_data.get('country')
         proxy = keyword_data.get('proxy')
         
-        print(f"\n🔍 Processing: '{keyword}' for {url}")
-        
+        if country:
+            print(f"\nðŸ” Processing: '{keyword}' for {url} (Country: {country.upper()})")
+        else:
+            print(f"\nðŸ” Processing: '{keyword}' for {url}")
+
         try:
             # Use your existing scraper with visible browser
             scraper = GoogleRankScraper(proxy=proxy)
-            position = await scraper.get_ranking(keyword, url)
+            position = await scraper.get_ranking(keyword, url, country=country)
             
             # Send result back
             if self.update_position(keyword_id, position):
