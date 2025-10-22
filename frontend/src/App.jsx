@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, Clock } from 'lucide-react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import Login from './components/Login';
 
 // Backend deployed on Render
-const API_URL = 'https://google-scraper-1.onrender.com';
+const API_URL = ''; // Base URL for API calls, will be proxied by Vite
 
 const countryList = [
   { code: '', name: 'Global / Auto' },
@@ -19,7 +22,21 @@ const countryList = [
   { code: 'in', name: 'India' },
 ];
 
-const RankTrackerDashboard = () => {
+// Configure axios to include the token in all requests
+axios.interceptors.request.use(
+  config => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  error => {
+    return Promise.reject(error);
+  }
+);
+
+const RankTrackerDashboard = ({ token, setToken }) => {
   const [keywords, setKeywords] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
@@ -32,23 +49,30 @@ const RankTrackerDashboard = () => {
     country: '',
     proxy: ''
   });
+  const navigate = useNavigate();
 
   // Fetch keywords on mount
   useEffect(() => {
-    fetchKeywords();
-  }, []);
+    if (token) {
+      fetchKeywords();
+    }
+  }, [token]);
 
   const fetchKeywords = async () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/api/keywords`);
-      if (!response.ok) throw new Error('Failed to fetch keywords');
-      const data = await response.json();
-      setKeywords(data.keywords || []);
+      const response = await axios.get(`${API_URL}/api/keywords`);
+      setKeywords(response.data.keywords || []);
     } catch (err) {
-      setError(err.message);
-      console.error('Error fetching keywords:', err);
+      if (err.response && err.response.status === 401) {
+        setToken(null);
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        setError(err.message);
+        console.error('Error fetching keywords:', err);
+      }
     } finally {
       setLoading(false);
     }
@@ -62,23 +86,20 @@ const RankTrackerDashboard = () => {
 
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/api/track`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newTrack)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to add keyword');
-      }
+      const response = await axios.post(`${API_URL}/api/track`, newTrack);
 
       setNewTrack({ keyword: '', url: '', country: '', proxy: '' });
       setShowAddForm(false);
       await fetchKeywords();
     } catch (err) {
-      setError(err.message);
-      console.error('Error adding keyword:', err);
+      if (err.response && err.response.status === 401) {
+        setToken(null);
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        setError(err.response?.data?.detail || err.message);
+        console.error('Error adding keyword:', err);
+      }
     }
   };
 
@@ -86,27 +107,24 @@ const RankTrackerDashboard = () => {
     setIsChecking(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/api/check`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({})
-      });
-
-      if (!response.ok) throw new Error('Failed to check rankings');
+      const response = await axios.post(`${API_URL}/api/check`, {});
       
-      const result = await response.json();
+      const result = response.data;
       
-      // Show message about local processing
       if (result.status === 'queued') {
         alert(`✅ Scraping started! ${result.total_keywords} keyword(s) queued for local processing with visible browser.\n\nResults will appear automatically when your local scraper processes them.`);
-        
-        // Start polling for results
         startPollingForResults();
       }
       
     } catch (err) {
-      setError(err.message);
-      console.error('Error checking rankings:', err);
+      if (err.response && err.response.status === 401) {
+        setToken(null);
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        setError(err.response?.data?.detail || err.message);
+        console.error('Error checking rankings:', err);
+      }
     } finally {
       setIsChecking(false);
     }
@@ -116,27 +134,24 @@ const RankTrackerDashboard = () => {
     setCheckingKeywords(prev => new Set([...prev, keywordId]));
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/api/check`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keyword_id: keywordId })
-      });
-
-      if (!response.ok) throw new Error('Failed to check ranking');
+      const response = await axios.post(`${API_URL}/api/check`, { keyword_id: keywordId });
       
-      const result = await response.json();
+      const result = response.data;
       
-      // Show message about local processing
       if (result.status === 'queued') {
         alert(`✅ Scraping started for selected keyword!\n\nResults will appear automatically when your local scraper processes them.`);
-        
-        // Start polling for results
         startPollingForResults();
       }
       
     } catch (err) {
-      setError(err.message);
-      console.error('Error checking ranking:', err);
+      if (err.response && err.response.status === 401) {
+        setToken(null);
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        setError(err.response?.data?.detail || err.message);
+        console.error('Error checking ranking:', err);
+      }
     } finally {
       setCheckingKeywords(prev => {
         const newSet = new Set(prev);
@@ -147,7 +162,6 @@ const RankTrackerDashboard = () => {
   };
 
   const startPollingForResults = () => {
-    // Poll every 10 seconds for updated results
     const pollInterval = setInterval(async () => {
       try {
         await fetchKeywords();
@@ -156,7 +170,6 @@ const RankTrackerDashboard = () => {
       }
     }, 10000);
 
-    // Stop polling after 5 minutes
     setTimeout(() => {
       clearInterval(pollInterval);
     }, 300000);
@@ -166,16 +179,17 @@ const RankTrackerDashboard = () => {
     if (!confirm('Are you sure you want to delete this keyword?')) return;
 
     try {
-      const response = await fetch(`${API_URL}/api/keyword/${id}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) throw new Error('Failed to delete keyword');
-      
+      await axios.delete(`${API_URL}/api/keyword/${id}`);
       await fetchKeywords();
     } catch (err) {
-      setError(err.message);
-      console.error('Error deleting keyword:', err);
+      if (err.response && err.response.status === 401) {
+        setToken(null);
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        setError(err.response?.data?.detail || err.message);
+        console.error('Error deleting keyword:', err);
+      }
     }
   };
 
@@ -222,12 +236,26 @@ const RankTrackerDashboard = () => {
     });
   };
 
+  const handleLogout = () => {
+    setToken(null);
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Rank Tracker</h1>
-          <p className="text-sm sm:text-base text-gray-300">Track your pages in Google's top 30 results</p>
+        <div className="mb-6 sm:mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">Rank Tracker</h1>
+            <p className="text-sm sm:text-base text-gray-300">Track your pages in Google's top 30 results</p>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="px-3 py-1 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
+          >
+            Logout
+          </button>
         </div>
 
         {error && (
@@ -553,4 +581,20 @@ const RankTrackerDashboard = () => {
   );
 };
 
-export default RankTrackerDashboard;
+const App = () => {
+  const [token, setToken] = useState(localStorage.getItem('token'));
+
+  return (
+    <Router>
+      <Routes>
+        <Route path="/login" element={<Login setToken={setToken} />} />
+        <Route
+          path="/*"
+          element={token ? <RankTrackerDashboard token={token} setToken={setToken} /> : <Navigate to="/login" replace />}
+        />
+      </Routes>
+    </Router>
+  );
+};
+
+export default App;
