@@ -168,6 +168,14 @@ async def add_tracking(data: KeywordCreate, current_user: dict = Depends(get_cur
     
     return {"id": keyword_id, "message": "Keyword added successfully"}
 
+@app.put("/api/keyword/{keyword_id}")
+async def update_keyword(keyword_id: int, data: KeywordCreate, current_user: dict = Depends(get_current_user)):
+    """Update an existing keyword"""
+    updated = db.update_keyword(keyword_id, data.keyword, data.url, data.country, data.proxy)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Keyword not found")
+    return {"message": "Keyword updated successfully"}
+
 @app.get("/api/keywords")
 async def get_keywords(current_user: dict = Depends(get_current_user)):
     """Get all tracked keywords with latest position"""

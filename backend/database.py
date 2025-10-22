@@ -115,3 +115,12 @@ class Database:
         with self.get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute('DELETE FROM keywords WHERE id = ?', (keyword_id,))
+
+    def update_keyword(self, keyword_id, keyword, url, country=None, proxy=None):
+        with self.get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                'UPDATE keywords SET keyword = ?, url = ?, country = ?, proxy = ? WHERE id = ?',
+                (keyword, url, country, proxy, keyword_id)
+            )
+            return cursor.rowcount > 0 # Returns True if a row was updated
