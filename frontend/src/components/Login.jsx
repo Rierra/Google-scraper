@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_BASE_URL || ''; // Ensure API_URL is available here
+
 const Login = ({ setToken }) => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -12,8 +14,8 @@ const Login = ({ setToken }) => {
     e.preventDefault();
     setError('');
     try {
-      console.log('Attempting login to:', `/api/login`);
-      const response = await axios.post('/api/login', {
+      console.log('Attempting login to:', `${API_URL}/api/login`);
+      const response = await axios.post(`${API_URL}/api/login`, {
         username,
         password,
       });
