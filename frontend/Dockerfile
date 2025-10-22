@@ -8,6 +8,12 @@ COPY package*.json ./
 # Install dependencies
 RUN npm ci --only=production
 
+# Declare build argument for API URL
+ARG VITE_API_BASE_URL
+
+# Set environment variable for Vite to pick up
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 # Copy source code
 COPY . .
 

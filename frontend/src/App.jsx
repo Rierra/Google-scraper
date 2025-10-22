@@ -5,7 +5,7 @@ import axios from 'axios';
 import Login from './components/Login';
 
 // Backend deployed on Render
-const API_URL = ''; // Base URL for API calls, will be proxied by Vite
+const API_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const countryList = [
   { code: '', name: 'Global / Auto' },
