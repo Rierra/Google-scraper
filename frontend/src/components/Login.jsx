@@ -12,6 +12,7 @@ const Login = ({ setToken }) => {
     e.preventDefault();
     setError('');
     try {
+      console.log('Attempting login to:', `/api/login`);
       const response = await axios.post('/api/login', {
         username,
         password,
