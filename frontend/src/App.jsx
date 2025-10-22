@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, Clock, Edit, Save, X } from 'lucide-react';
+import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, Clock, Edit, Save, X, Loader2 } from 'lucide-react'; // Added Loader2 for spinner
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Login from './components/Login';
@@ -138,7 +138,11 @@ const RankTrackerDashboard = ({ token, setToken }) => {
   };
 
   const handleCheckSingleKeyword = async (keywordId) => {
-    setCheckingKeywords(prev => new Set([...prev, keywordId]));
+    setCheckingKeywords(prev => {
+      const newSet = new Set(prev);
+      newSet.add(keywordId);
+      return newSet;
+    });
     setError(null);
     try {
       const response = await axios.post(`${API_URL}/api/check`, { keyword_id: keywordId });
@@ -557,7 +561,11 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                           
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-1">
-                              {item.position ? (
+                              {checkingKeywords.has(item.id) ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-gray-700 text-gray-300 border border-gray-600">
+                                  <Loader2 className="animate-spin mr-1" size={12} /> Checking...
+                                </span>
+                              ) : item.position ? (
                                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-900/50 text-blue-300 border border-blue-700">
                                   #{item.position}
                                 </span>
@@ -645,7 +653,11 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                             </select>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            {item.position ? (
+                            {checkingKeywords.has(item.id) ? (
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gray-700 text-gray-300 border border-gray-600">
+                                <Loader2 className="animate-spin mr-1" size={16} /> Checking...
+                              </span>
+                            ) : item.position ? (
                               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-900/50 text-blue-300 border border-blue-700">
                                 #{item.position}
                               </span>
@@ -712,7 +724,11 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                             <span className="text-sm text-gray-300">{getCountryName(item.country)}</span>
                           </td>
                           <td className="px-6 py-4 text-center">
-                            {item.position ? (
+                            {checkingKeywords.has(item.id) ? (
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-gray-700 text-gray-300 border border-gray-600">
+                                <Loader2 className="animate-spin mr-1" size={16} /> Checking...
+                              </span>
+                            ) : item.position ? (
                               <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-900/50 text-blue-300 border border-blue-700">
                                 #{item.position}
                               </span>
