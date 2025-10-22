@@ -51,10 +51,10 @@ ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH")
 
 if not ADMIN_PASSWORD_HASH:
     logger.warning("ADMIN_PASSWORD_HASH not set. Please set it in .env for secure authentication.")
-    # For development, you might want to generate one or use a default
-    # For production, this should always be set.
-    # Example: python -c "import bcrypt; print(bcrypt.hashpw(b'your_dev_password', bcrypt.gensalt()).decode('utf-8'))"
     ADMIN_PASSWORD_HASH = pwd_context.hash("dev_password") # Fallback for development, DO NOT USE IN PRODUCTION
+
+logger.info(f"Loaded ADMIN_USERNAME: {ADMIN_USERNAME}")
+logger.info(f"Loaded ADMIN_PASSWORD_HASH (truncated): {ADMIN_PASSWORD_HASH[:10]}...")
 # --- End Authentication Configuration ---
 
 app = FastAPI(title="Google Rank Tracker API")
