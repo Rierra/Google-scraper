@@ -1,14 +1,10 @@
-#!/usr/bin/env python3
-"""
-Pre-configured local scraper with PROXY support
-"""
-
 import requests
 import asyncio
 import time
 import sys
 import os
 import warnings
+import random # Added for random.uniform
 
 # Suppress the Windows handle warning during cleanup
 warnings.filterwarnings("ignore", category=ResourceWarning)
@@ -32,20 +28,46 @@ def patched_quit(self):
 uc.Chrome.quit = patched_quit
 
 class LocalRankProcessor:
-    def __init__(self, api_url, proxy=None):
+    def __init__(self, api_url, username, password, proxy=None):
         """
         Initialize the local processor
         
         Args:
             api_url: URL of your deployed Render app
+            username: Username for backend authentication
+            password: Password for backend authentication
             proxy: Proxy URL in format: http://username:password@host:port
         """
         self.api_url = api_url.rstrip('/')
         self.session = requests.Session()
+        self.username = username
+        self.password = password
         self.default_proxy = proxy
-        
+        self.jwt_token = None
+
+    def _authenticate(self):
+        """Authenticates with the backend and stores the JWT token."""
+        try:
+            login_data = {"username": self.username, "password": self.password}
+            response = self.session.post(f"{self.api_url}/api/login", json=login_data)
+            response.raise_for_status()  # Raise an exception for HTTP errors
+            token_data = response.json()
+            self.jwt_token = token_data["access_token"]
+            self.session.headers.update({"Authorization": f"Bearer {self.jwt_token}"})
+            print("✅ Successfully authenticated with backend.")
+            return True
+        except requests.exceptions.HTTPError as e:
+            print(f"❌ Authentication failed: {e.response.status_code} - {e.response.text}")
+            return False
+        except Exception as e:
+            print(f"❌ Error during authentication: {e}")
+            return False
+
     def get_pending_keywords(self):
         """Get keywords that need to be scraped from the Render API"""
+        if not self.jwt_token:
+            if not self._authenticate():
+                return []
         try:
             response = self.session.get(f"{self.api_url}/api/check")
             if response.status_code == 200:
@@ -54,15 +76,29 @@ class LocalRankProcessor:
             elif response.status_code == 404:
                 # No keywords to check - this is normal
                 return []
+            elif response.status_code == 401:
+                print("⚠️ JWT expired or invalid. Re-authenticating...")
+                if self._authenticate():
+                    # Retry request after re-authentication
+                    response = self.session.get(f"{self.api_url}/api/check")
+                    response.raise_for_status()
+                    data = response.json()
+                    return data.get("keywords", [])
+                else:
+                    print("❌ Failed to re-authenticate. Cannot fetch keywords.")
+                    return []
             else:
                 print(f"❌ Error fetching keywords: {response.status_code}")
                 return []
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             print(f"❌ Error connecting to API: {e}")
             return []
     
     def update_position(self, keyword_id, position):
         """Send scraping results back to Render API"""
+        if not self.jwt_token:
+            if not self._authenticate():
+                return False
         try:
             data = {
                 "keyword_id": keyword_id,
@@ -72,10 +108,21 @@ class LocalRankProcessor:
             if response.status_code == 200:
                 print(f"✅ Updated keyword {keyword_id}: Position {position}")
                 return True
+            elif response.status_code == 401:
+                print("⚠️ JWT expired or invalid. Re-authenticating...")
+                if self._authenticate():
+                    # Retry request after re-authentication
+                    response = self.session.post(f"{self.api_url}/api/update-position", json=data)
+                    response.raise_for_status()
+                    print(f"✅ Updated keyword {keyword_id}: Position {position} after re-auth")
+                    return True
+                else:
+                    print("❌ Failed to re-authenticate. Cannot update position.")
+                    return False
             else:
                 print(f"❌ Failed to update keyword {keyword_id}: {response.status_code}")
                 return False
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             print(f"❌ Error updating position: {e}")
             return False
     
@@ -136,6 +183,11 @@ class LocalRankProcessor:
         print(f"🔄 Script will stay running - close with Ctrl+C to stop")
         print("-" * 60)
         
+        # Initial authentication
+        if not self._authenticate():
+            print("❌ Initial authentication failed. Exiting.")
+            return
+
         while True:
             try:
                 # Get keywords from Render API
@@ -179,6 +231,13 @@ def main():
     # Your deployed backend URL
     api_url = "https://google-scraper-1.onrender.com"
     
+    # --- Scraper Authentication Credentials ---
+    # These should match your backend admin credentials
+    # For security, consider loading these from environment variables
+    scraper_username = os.getenv("SCRAPER_USERNAME", "Ronaldo") # Default to Ronaldo
+    scraper_password = os.getenv("SCRAPER_PASSWORD", "test123") # Default to test123
+    # ------------------------------------------
+
     # ============================================
     # CONFIGURE YOUR PROXY HERE
     # ============================================
@@ -201,16 +260,20 @@ def main():
     print("=" * 60)
     
     # Create and run processor
-    processor = LocalRankProcessor(api_url, proxy=proxy)
+    processor = LocalRankProcessor(api_url, scraper_username, scraper_password, proxy=proxy)
     
     try:
-        # Test connection first
-        print("🔍 Testing connection to backend...")
+        # Test connection first (this will now include authentication)
+        print("🔍 Testing connection to backend (and authenticating)...")
+        # The first call to get_pending_keywords will trigger authentication
         keywords = processor.get_pending_keywords()
-        print("✅ Connection successful!")
+        if keywords is not None: # Check for None in case of auth failure
+            print("✅ Connection and initial authentication successful!")
+        else:
+            print("❌ Initial connection or authentication failed. Exiting.")
+            return
         
         # Run continuously, waiting for triggers
-        import random
         asyncio.run(processor.run_continuous(check_interval=10))
             
     except KeyboardInterrupt:
