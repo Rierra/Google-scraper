@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, Clock } from 'lucide-react';
+import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, Clock, Edit, Save, X } from 'lucide-react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Login from './components/Login';
@@ -44,6 +44,13 @@ const RankTrackerDashboard = ({ token, setToken }) => {
   const [error, setError] = useState(null);
   const [checkingKeywords, setCheckingKeywords] = useState(new Set());
   const [newTrack, setNewTrack] = useState({
+    keyword: '',
+    url: '',
+    country: '',
+    proxy: ''
+  });
+  const [editingKeywordId, setEditingKeywordId] = useState(null);
+  const [editedKeywordData, setEditedKeywordData] = useState({
     keyword: '',
     url: '',
     country: '',
@@ -189,6 +196,49 @@ const RankTrackerDashboard = ({ token, setToken }) => {
       } else {
         setError(err.response?.data?.detail || err.message);
         console.error('Error deleting keyword:', err);
+      }
+    }
+  };
+
+  const handleEditClick = (keyword) => {
+    setEditingKeywordId(keyword.id);
+    setEditedKeywordData({
+      keyword: keyword.keyword,
+      url: keyword.url,
+      country: keyword.country || '',
+      proxy: keyword.proxy || ''
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingKeywordId(null);
+    setEditedKeywordData({
+      keyword: '',
+      url: '',
+      country: '',
+      proxy: ''
+    });
+  };
+
+  const handleSaveEdit = async (id) => {
+    if (!editedKeywordData.keyword || !editedKeywordData.url) {
+      setError('Keyword and URL are required');
+      return;
+    }
+
+    setError(null);
+    try {
+      await axios.put(`${API_URL}/api/keyword/${id}`, editedKeywordData);
+      setEditingKeywordId(null);
+      await fetchKeywords();
+    } catch (err) {
+      if (err.response && err.response.status === 401) {
+        setToken(null);
+        localStorage.removeItem('token');
+        navigate('/login');
+      } else {
+        setError(err.response?.data?.detail || err.message);
+        console.error('Error saving keyword:', err);
       }
     }
   };
@@ -407,6 +457,32 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-2">
+                        {editingKeywordId === item.id ? (
+                          <>
+                            <button
+                              onClick={() => handleSaveEdit(item.id)}
+                              className="text-green-400 hover:text-green-300 transition-colors"
+                              title="Save"
+                            >
+                              <Save size={16} />
+                            </button>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="text-gray-400 hover:text-gray-300 transition-colors"
+                              title="Cancel"
+                            >
+                              <X size={16} />
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleEditClick(item)}
+                            className="text-yellow-400 hover:text-yellow-300 transition-colors"
+                            title="Edit"
+                          >
+                            <Edit size={16} />
+                          </button>
+                        )}
                         <button
                           onClick={() => handleCheckSingleKeyword(item.id)}
                           disabled={checkingKeywords.has(item.id)}
@@ -426,40 +502,84 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                     </div>
                     
                     <div className="space-y-2">
-                      <div>
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-400 hover:text-blue-300 break-all transition-colors"
-                        >
-                          {item.url}
-                        </a>
-                      </div>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1">
-                          {item.position ? (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-900/50 text-blue-300 border border-blue-700">
-                              #{item.position}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-500">Not checked</span>
-                          )}
-                        </div>
-                        
-                        <div className="flex items-center gap-2 text-xs text-gray-400">
-                          <div className="flex items-center gap-1">
-                            <Calendar size={12} />
-                            <span>{formatDateShort(item.created_at)}</span>
+                      {editingKeywordId === item.id ? (
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1">Keyword</label>
+                            <input
+                              type="text"
+                              value={editedKeywordData.keyword}
+                              onChange={(e) => setEditedKeywordData({...editedKeywordData, keyword: e.target.value})}
+                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1">URL</label>
+                            <input
+                              type="url"
+                              value={editedKeywordData.url}
+                              onChange={(e) => setEditedKeywordData({...editedKeywordData, url: e.target.value})}
+                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1">Country</label>
+                            <select
+                              value={editedKeywordData.country}
+                              onChange={(e) => setEditedKeywordData({...editedKeywordData, country: e.target.value})}
+                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-xs"
+                            >
+                              {countryList.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1">Proxy</label>
+                            <input
+                              type="text"
+                              value={editedKeywordData.proxy}
+                              onChange={(e) => setEditedKeywordData({...editedKeywordData, proxy: e.target.value})}
+                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-xs"
+                            />
                           </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-1 text-xs text-gray-400">
-                        <Clock size={12} />
-                        <span>{formatDate(item.checked_at)}</span>
-                      </div>
+                      ) : (
+                        <>
+                          <div>
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs text-blue-400 hover:text-blue-300 break-all transition-colors"
+                            >
+                              {item.url}
+                            </a>
+                          </div>
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1">
+                              {item.position ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-semibold bg-blue-900/50 text-blue-300 border border-blue-700">
+                                  #{item.position}
+                                </span>
+                              ) : (
+                                <span className="text-xs text-gray-500">Not checked</span>
+                              )}
+                            </div>
+                            
+                            <div className="flex items-center gap-2 text-xs text-gray-400">
+                              <div className="flex items-center gap-1">
+                                <Calendar size={12} />
+                                <span>{formatDateShort(item.created_at)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-1 text-xs text-gray-400">
+                            <Clock size={12} />
+                            <span>{formatDate(item.checked_at)}</span>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -497,71 +617,153 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                 <tbody className="divide-y divide-gray-700">
                   {keywords.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-700/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <Search size={16} className="text-gray-500" />
-                          <span className="text-sm font-medium text-white">
-                            {item.keyword}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-blue-400 hover:text-blue-300 truncate block max-w-xs transition-colors"
-                        >
-                          {item.url}
-                        </a>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm text-gray-300">{getCountryName(item.country)}</span>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        {item.position ? (
-                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-900/50 text-blue-300 border border-blue-700">
-                            #{item.position}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-500">Not checked</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1">
-                          <Calendar size={14} className="text-gray-500" />
-                          <span className="text-sm text-gray-300">
-                            {formatDateShort(item.created_at)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1">
-                          <Clock size={14} className="text-gray-500" />
-                          <span className="text-sm text-gray-300">
-                            {formatDate(item.checked_at)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            onClick={() => handleCheckSingleKeyword(item.id)}
-                            disabled={checkingKeywords.has(item.id)}
-                            className="text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Check this keyword"
-                          >
-                            <RefreshCw size={16} className={checkingKeywords.has(item.id) ? 'animate-spin' : ''} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.id)}
-                            className="text-red-400 hover:text-red-300 transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+                      {editingKeywordId === item.id ? (
+                        <>
+                          <td className="px-6 py-4">
+                            <input
+                              type="text"
+                              value={editedKeywordData.keyword}
+                              onChange={(e) => setEditedKeywordData({...editedKeywordData, keyword: e.target.value})}
+                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-sm"
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <input
+                              type="url"
+                              value={editedKeywordData.url}
+                              onChange={(e) => setEditedKeywordData({...editedKeywordData, url: e.target.value})}
+                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-sm"
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <select
+                              value={editedKeywordData.country}
+                              onChange={(e) => setEditedKeywordData({...editedKeywordData, country: e.target.value})}
+                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-sm"
+                            >
+                              {countryList.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {item.position ? (
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-900/50 text-blue-300 border border-blue-700">
+                                #{item.position}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-gray-500">Not checked</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1">
+                              <Calendar size={14} className="text-gray-500" />
+                              <span className="text-sm text-gray-300">
+                                {formatDateShort(item.created_at)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1">
+                              <Clock size={14} className="text-gray-500" />
+                              <span className="text-sm text-gray-300">
+                                {formatDate(item.checked_at)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => handleSaveEdit(item.id)}
+                                className="text-green-400 hover:text-green-300 transition-colors"
+                                title="Save"
+                              >
+                                <Save size={16} />
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="text-gray-400 hover:text-gray-300 transition-colors"
+                                title="Cancel"
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Search size={16} className="text-gray-500" />
+                              <span className="text-sm font-medium text-white">
+                                {item.keyword}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <a
+                              href={item.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-blue-400 hover:text-blue-300 truncate block max-w-xs transition-colors"
+                            >
+                              {item.url}
+                            </a>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm text-gray-300">{getCountryName(item.country)}</span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            {item.position ? (
+                              <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-900/50 text-blue-300 border border-blue-700">
+                                #{item.position}
+                              </span>
+                            ) : (
+                              <span className="text-sm text-gray-500">Not checked</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1">
+                              <Calendar size={14} className="text-gray-500" />
+                              <span className="text-sm text-gray-300">
+                                {formatDateShort(item.created_at)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1">
+                              <Clock size={14} className="text-gray-500" />
+                              <span className="text-sm text-gray-300">
+                                {formatDate(item.checked_at)}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                onClick={() => handleEditClick(item)}
+                                className="text-yellow-400 hover:text-yellow-300 transition-colors"
+                                title="Edit"
+                              >
+                                <Edit size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleCheckSingleKeyword(item.id)}
+                                disabled={checkingKeywords.has(item.id)}
+                                className="text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Check this keyword"
+                              >
+                                <RefreshCw size={16} className={checkingKeywords.has(item.id) ? 'animate-spin' : ''} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(item.id)}
+                                className="text-red-400 hover:text-red-300 transition-colors"
+                                title="Delete"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>
