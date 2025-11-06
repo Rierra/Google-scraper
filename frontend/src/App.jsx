@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, Clock, Edit, Save, X } from 'lucide-react';
+import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, Clock, Edit, Save, X, Upload, Download, FileText } from 'lucide-react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Login from './components/Login';
@@ -61,6 +61,11 @@ const RankTrackerDashboard = ({ token, setToken }) => {
     proxy: '',
     client_name: ''
   });
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
+  const [csvPreview, setCsvPreview] = useState([]);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importErrors, setImportErrors] = useState([]);
   const navigate = useNavigate();
 
   // Fetch keywords on mount
@@ -315,6 +320,176 @@ const RankTrackerDashboard = ({ token, setToken }) => {
     navigate('/login');
   };
 
+  const downloadSampleCSV = () => {
+    const sampleData = [
+      ['keyword', 'url', 'country', 'proxy', 'client_name'],
+      ['best productivity tools', 'https://example.com/productivity', 'us', '', 'Client A'],
+      ['SEO tips 2025', 'https://example.com/seo', 'gb', 'http://proxy:port', 'Client B'],
+      ['web development', 'https://example.com/webdev', '', '', '']
+    ];
+    
+    const csvContent = sampleData.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'bulk_import_template.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const parseCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length === 0) return [];
+    
+    // Simple CSV parser that handles quoted fields
+    const parseCSVLine = (line) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        const nextChar = line[i + 1];
+        
+        if (char === '"') {
+          if (inQuotes && nextChar === '"') {
+            // Escaped quote
+            current += '"';
+            i++; // Skip next quote
+          } else {
+            // Toggle quote state
+            inQuotes = !inQuotes;
+          }
+        } else if (char === ',' && !inQuotes) {
+          // End of field
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      // Add last field
+      result.push(current.trim());
+      return result;
+    };
+    
+    // Parse header
+    const header = parseCSVLine(lines[0]).map(h => h.replace(/^"|"$/g, '').toLowerCase());
+    
+    // Find column indices
+    const keywordIdx = header.indexOf('keyword');
+    const urlIdx = header.indexOf('url');
+    const countryIdx = header.indexOf('country');
+    const proxyIdx = header.indexOf('proxy');
+    const clientNameIdx = header.indexOf('client_name');
+    
+    if (keywordIdx === -1 || urlIdx === -1) {
+      throw new Error('CSV must contain "keyword" and "url" columns');
+    }
+    
+    // Parse rows
+    const parsed = [];
+    for (let i = 1; i < lines.length; i++) {
+      const values = parseCSVLine(lines[i]).map(v => v.replace(/^"|"$/g, ''));
+      if (values[keywordIdx] && values[urlIdx]) {
+        parsed.push({
+          keyword: values[keywordIdx],
+          url: values[urlIdx],
+          country: countryIdx >= 0 ? (values[countryIdx] || '') : '',
+          proxy: proxyIdx >= 0 ? (values[proxyIdx] || '') : '',
+          client_name: clientNameIdx >= 0 ? (values[clientNameIdx] || '') : ''
+        });
+      }
+    }
+    
+    return parsed;
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    if (!file.name.endsWith('.csv')) {
+      setError('Please upload a CSV file');
+      return;
+    }
+    
+    setCsvFile(file);
+    setImportErrors([]);
+    
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const parsed = parseCSV(text);
+        setCsvPreview(parsed);
+        if (parsed.length === 0) {
+          setError('No valid keywords found in CSV file');
+        }
+      } catch (err) {
+        setError(err.message);
+        setCsvPreview([]);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleBulkImport = async () => {
+    if (csvPreview.length === 0) {
+      setError('No keywords to import');
+      return;
+    }
+    
+    setIsImporting(true);
+    setError(null);
+    setImportErrors([]);
+    
+    const errors = [];
+    let successCount = 0;
+    
+    for (let i = 0; i < csvPreview.length; i++) {
+      const item = csvPreview[i];
+      try {
+        await axios.post(`${API_URL}/api/track`, item);
+        successCount++;
+      } catch (err) {
+        if (err.response && err.response.status === 401) {
+          setToken(null);
+          localStorage.removeItem('token');
+          navigate('/login');
+          setIsImporting(false);
+          return;
+        }
+        errors.push({
+          row: i + 2, // +2 because row 1 is header, and arrays are 0-indexed
+          keyword: item.keyword,
+          error: err.response?.data?.detail || err.message
+        });
+      }
+    }
+    
+    setIsImporting(false);
+    setImportErrors(errors);
+    
+    if (successCount > 0) {
+      await fetchKeywords();
+      await fetchClientNames();
+      if (errors.length === 0) {
+        alert(`✅ Successfully imported ${successCount} keyword(s)!`);
+        setShowBulkImport(false);
+        setCsvFile(null);
+        setCsvPreview([]);
+      } else {
+        alert(`✅ Imported ${successCount} keyword(s), but ${errors.length} failed. Check the error list below.`);
+      }
+    } else {
+      setError(`Failed to import any keywords. ${errors.length} error(s) occurred.`);
+    }
+  };
+
   const filteredKeywords = keywords.filter(k => 
     k.keyword.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -345,6 +520,160 @@ const RankTrackerDashboard = ({ token, setToken }) => {
           </div>
         )}
 
+        {/* Bulk Import Dialog */}
+        {showBulkImport && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className="bg-gray-800 rounded-lg shadow-xl border border-gray-700 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+              <div className="p-4 sm:p-6 border-b border-gray-700 flex items-center justify-between">
+                <h2 className="text-xl sm:text-2xl font-bold text-white">Bulk Import Keywords</h2>
+                <button
+                  onClick={() => {
+                    setShowBulkImport(false);
+                    setCsvFile(null);
+                    setCsvPreview([]);
+                    setImportErrors([]);
+                    setError(null);
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                {/* Instructions */}
+                <div className="mb-6 bg-blue-900/20 border border-blue-700/30 rounded-lg p-4">
+                  <h3 className="text-sm font-semibold text-blue-300 mb-2 flex items-center gap-2">
+                    <FileText size={18} />
+                    Instructions
+                  </h3>
+                  <ul className="text-xs sm:text-sm text-blue-200 space-y-1 list-disc list-inside">
+                    <li>Upload a CSV file with the following columns: <code className="bg-blue-900/50 px-1 rounded">keyword</code>, <code className="bg-blue-900/50 px-1 rounded">url</code> (required), and optionally <code className="bg-blue-900/50 px-1 rounded">country</code>, <code className="bg-blue-900/50 px-1 rounded">proxy</code>, <code className="bg-blue-900/50 px-1 rounded">client_name</code></li>
+                    <li>The CSV file should have a header row with column names</li>
+                    <li>Download the sample template below to see the correct format</li>
+                    <li>After uploading, review the preview before importing</li>
+                  </ul>
+                  <button
+                    onClick={downloadSampleCSV}
+                    className="mt-3 flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-xs sm:text-sm"
+                  >
+                    <Download size={16} />
+                    Download Sample CSV Template
+                  </button>
+                </div>
+
+                {/* File Upload */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Upload CSV File
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleFileUpload}
+                      className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700 file:cursor-pointer cursor-pointer"
+                    />
+                    {csvFile && (
+                      <span className="text-sm text-gray-400 flex items-center gap-2">
+                        <FileText size={16} />
+                        {csvFile.name}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Preview */}
+                {csvPreview.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-sm font-semibold text-gray-300 mb-3">
+                      Preview ({csvPreview.length} keyword{csvPreview.length !== 1 ? 's' : ''} to import)
+                    </h3>
+                    <div className="bg-gray-900 rounded-lg border border-gray-700 overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-700 border-b border-gray-600">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-300 uppercase">Keyword</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-300 uppercase">URL</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-300 uppercase">Country</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-300 uppercase">Client Name</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-700">
+                          {csvPreview.slice(0, 10).map((item, idx) => (
+                            <tr key={idx} className="hover:bg-gray-800/50">
+                              <td className="px-3 py-2 text-gray-300">{item.keyword}</td>
+                              <td className="px-3 py-2 text-gray-300 truncate max-w-xs">{item.url}</td>
+                              <td className="px-3 py-2 text-gray-300">{getCountryName(item.country)}</td>
+                              <td className="px-3 py-2 text-gray-300">{item.client_name || 'N/A'}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {csvPreview.length > 10 && (
+                        <div className="px-3 py-2 text-xs text-gray-400 text-center border-t border-gray-700">
+                          ... and {csvPreview.length - 10} more keyword{csvPreview.length - 10 !== 1 ? 's' : ''}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Import Errors */}
+                {importErrors.length > 0 && (
+                  <div className="mb-6 bg-red-900/20 border border-red-500/30 rounded-lg p-4">
+                    <h3 className="text-sm font-semibold text-red-300 mb-2 flex items-center gap-2">
+                      <AlertCircle size={18} />
+                      Import Errors ({importErrors.length})
+                    </h3>
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {importErrors.map((err, idx) => (
+                        <div key={idx} className="text-xs text-red-200">
+                          <span className="font-medium">Row {err.row}</span> ({err.keyword}): {err.error}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer Actions */}
+              <div className="p-4 sm:p-6 border-t border-gray-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowBulkImport(false);
+                    setCsvFile(null);
+                    setCsvPreview([]);
+                    setImportErrors([]);
+                    setError(null);
+                  }}
+                  className="px-4 py-2 bg-gray-700 text-gray-200 rounded-lg hover:bg-gray-600 transition-colors text-sm sm:text-base"
+                  disabled={isImporting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleBulkImport}
+                  disabled={isImporting || csvPreview.length === 0}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base flex items-center justify-center gap-2"
+                >
+                  {isImporting ? (
+                    <>
+                      <RefreshCw size={18} className="animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={18} />
+                      Import {csvPreview.length > 0 ? `${csvPreview.length} ` : ''}Keyword{csvPreview.length !== 1 ? 's' : ''}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-gray-800 rounded-lg shadow-sm p-3 sm:p-4 mb-4 sm:mb-6 border border-gray-700">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
@@ -355,6 +684,14 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                 <Plus size={18} />
                 <span className="hidden sm:inline">Add Keyword</span>
                 <span className="sm:hidden">Add</span>
+              </button>
+              <button
+                onClick={() => setShowBulkImport(true)}
+                className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm sm:text-base"
+              >
+                <Upload size={18} />
+                <span className="hidden sm:inline">Bulk Import</span>
+                <span className="sm:hidden">Import</span>
               </button>
               <button
                 onClick={handleCheckRankings}
