@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, Clock, Edit, Save, X, Upload, Download, FileText } from 'lucide-react';
+import { Search, Plus, RefreshCw, TrendingUp, TrendingDown, Minus, Trash2, AlertCircle, Calendar, Clock, Edit, Save, X, Upload, Download, FileText, Filter } from 'lucide-react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import Login from './components/Login';
@@ -723,13 +723,14 @@ const RankTrackerDashboard = ({ token, setToken }) => {
               />
             </div>
             <div className="relative w-full sm:w-1/2">
+              <Filter size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none z-10" />
               <select
                 value={selectedClient}
                 onChange={(e) => {
                   setSelectedClient(e.target.value);
                   fetchKeywords(e.target.value);
                 }}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 text-sm sm:text-base"
+                className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 text-sm sm:text-base appearance-none"
               >
                 <option value="">All Clients</option>
                 {clientNames.map(name => (
