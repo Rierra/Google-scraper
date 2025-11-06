@@ -36,9 +36,6 @@ class GoogleRankScraper:
         options.add_argument('--disable-extensions')
         options.add_argument('--disable-plugins')
         
-        # DON'T disable images for CAPTCHA solving - we need to see the audio button
-        # options.add_argument('--disable-images')  # REMOVED
-        
         # Handle proxy with extension for authentication
         if self.proxy:
             logger.info("Setting up proxy with authentication extension...")
@@ -48,6 +45,49 @@ class GoogleRankScraper:
                 logger.info("Proxy extension loaded")
         
         return options
+    
+    def _normalize_url(self, url):
+        """
+        Normalize URL for comparison by removing trailing slashes, www, and fragments.
+        Keep the full path for accurate matching.
+        """
+        if not url:
+            return ""
+        
+        try:
+            parsed = urlparse(url)
+            # Remove www. prefix
+            netloc = parsed.netloc.lower().replace('www.', '')
+            # Remove trailing slash from path
+            path = parsed.path.rstrip('/')
+            # Ignore fragments and query params for matching
+            normalized = f"{netloc}{path}"
+            return normalized
+        except:
+            return url.lower()
+    
+    def _urls_match(self, url1, url2):
+        """
+        Check if two URLs match using normalized comparison.
+        This ensures exact URL matching, not just domain matching.
+        """
+        norm1 = self._normalize_url(url1)
+        norm2 = self._normalize_url(url2)
+        
+        # Exact match
+        if norm1 == norm2:
+            return True
+        
+        # Check if one is a substring of the other (for URL variations)
+        # But only if they're very similar (> 80% match)
+        if norm1 and norm2:
+            shorter = min(norm1, norm2, key=len)
+            longer = max(norm1, norm2, key=len)
+            if len(shorter) > 10 and shorter in longer:
+                similarity = len(shorter) / len(longer)
+                return similarity > 0.8
+        
+        return False
     
     def _transcribe_with_whisper(self, audio_path):
         """
@@ -463,12 +503,12 @@ class GoogleRankScraper:
             logger.error(f"Error creating proxy extension: {e}")
             return None
     
-    def _extract_results_from_page(self, driver, seen_domains, current_position):
+    def _extract_results_from_page(self, driver, target_url):
         """
         Extract organic search results from the current page.
-        Returns: list of URLs found on this page
+        Returns: list of (position, URL) tuples found on this page
         """
-        links = []
+        results = []
         
         logger.info("Extracting search results from current page...")
         
@@ -520,13 +560,10 @@ class GoogleRankScraper:
                             'google.co.' not in href and
                             'webcache' not in href):
                             
-                            domain = urlparse(href).netloc
-                            if domain not in seen_domains:
-                                parent_text = link.find_element(By.XPATH, './ancestor::div[1]').text
-                                if 'Ad' not in parent_text and 'Sponsored' not in parent_text:
-                                    links.append(href)
-                                    seen_domains[domain] = current_position + len(links)
-                                    logger.debug(f"Fallback position {current_position + len(links)}: {href}")
+                            parent_text = link.find_element(By.XPATH, './ancestor::div[1]').text
+                            if 'Ad' not in parent_text and 'Sponsored' not in parent_text:
+                                results.append(href)
+                                logger.debug(f"Fallback result: {href}")
                     except:
                         continue
             except Exception as e:
@@ -591,25 +628,23 @@ class GoogleRankScraper:
                             'google.co.' not in href and
                             'webcache.googleusercontent.com' not in href):
                             
-                            try:
-                                domain = urlparse(href).netloc
-                                
-                                if domain not in seen_domains:
-                                    links.append(href)
-                                    seen_domains[domain] = current_position + len(links)
-                                    logger.debug(f"Position {current_position + len(links)}: {href}")
-                                else:
-                                    logger.debug(f"Skipping duplicate domain: {domain}")
-                                    
-                            except Exception as e:
-                                logger.debug(f"Error parsing URL {href}: {e}")
+                            results.append(href)
+                            logger.debug(f"Extracted result: {href}")
                                 
                 except Exception as e:
                     logger.debug(f"Error processing container: {e}")
                     continue
         
-        logger.info(f"Extracted {len(links)} new results from this page")
-        return links
+        logger.info(f"Extracted {len(results)} organic results from this page")
+        
+        # Log URLs for debugging
+        if results:
+            logger.info("Results found on this page:")
+            for idx, url in enumerate(results, 1):
+                match_indicator = " ← TARGET MATCH!" if self._urls_match(url, target_url) else ""
+                logger.info(f"  [{idx}] {url}{match_indicator}")
+        
+        return results
     
     def _click_next_page(self, driver):
         """
@@ -679,7 +714,7 @@ class GoogleRankScraper:
         
         Args:
             keyword: Search term
-            target_url: URL to find
+            target_url: URL to find (exact match)
             country: Two-letter country code for search (e.g., 'us', 'ca')
             max_results: Maximum number of results to check (default: 100)
             max_pages: Maximum number of pages to scrape (default: 10)
@@ -691,6 +726,7 @@ class GoogleRankScraper:
         else:
             logger.info(f"Starting rank check for keyword: '{keyword}', URL: '{target_url}'")
         logger.info(f"Will check up to {max_pages} pages or {max_results} results")
+        logger.info(f"Target URL normalized: {self._normalize_url(target_url)}")
         
         driver = None
         try:
@@ -733,26 +769,23 @@ class GoogleRankScraper:
                     logger.error("✗ Failed to solve CAPTCHA")
                     return None
             
-            # Track all links across pages
-            all_links = []
-            seen_domains = {}
-            target_domain = urlparse(target_url).netloc
-            logger.info(f"Looking for domain: {target_domain}")
+            # Track all URLs found across pages with their absolute positions
+            all_results = []  # List of URLs in order
+            position = None
             
             # Scrape multiple pages
             page_num = 1
-            position = None
             
-            while page_num <= max_pages and len(all_links) < max_results:
+            while page_num <= max_pages and len(all_results) < max_results:
                 logger.info(f"\n{'='*60}")
                 logger.info(f"SCRAPING PAGE {page_num}")
+                logger.info(f"Results found so far: {len(all_results)}")
                 logger.info(f"{'='*60}")
                 
                 # Extract results from current page
-                current_position = len(all_links)
-                page_links = self._extract_results_from_page(driver, seen_domains, current_position)
+                page_results = self._extract_results_from_page(driver, target_url)
                 
-                if not page_links:
+                if not page_results:
                     logger.warning(f"No results found on page {page_num}")
                     
                     if page_num == 1:
@@ -767,29 +800,30 @@ class GoogleRankScraper:
                     
                     break
                 
-                # Add to all links
-                all_links.extend(page_links)
+                # Add to all results and check for target
+                for url in page_results:
+                    all_results.append(url)
+                    current_position = len(all_results)
+                    
+                    # Check if this URL matches our target
+                    if self._urls_match(url, target_url):
+                        position = current_position
+                        logger.info(f"\n{'='*60}")
+                        logger.info(f"✓ FOUND at position #{position} (Page {page_num})!")
+                        logger.info(f"   Target URL: {target_url}")
+                        logger.info(f"   Matched URL: {url}")
+                        logger.info(f"   Normalized target: {self._normalize_url(target_url)}")
+                        logger.info(f"   Normalized match: {self._normalize_url(url)}")
+                        logger.info(f"{'='*60}")
+                        return position
                 
-                # Check if target is in this page's results
-                for idx, href in enumerate(page_links, current_position + 1):
-                    try:
-                        link_domain = urlparse(href).netloc
-                        
-                        if target_url in href or target_domain == link_domain or target_domain in link_domain:
-                            position = idx
-                            logger.info(f"\n{'='*60}")
-                            logger.info(f"✓ FOUND at position {position} (Page {page_num})!")
-                            logger.info(f"   Matched URL: {href}")
-                            logger.info(f"{'='*60}")
-                            return position
-                    except:
-                        continue
+                logger.info(f"Total results so far: {len(all_results)}")
                 
-                logger.info(f"Total results so far: {len(all_links)}")
-                logger.info(f"Target not found yet, continuing to next page...")
+                if position is None:
+                    logger.info(f"Target not found yet on page {page_num}, continuing...")
                 
                 # Stop if we've checked enough results
-                if len(all_links) >= max_results:
+                if len(all_results) >= max_results:
                     logger.info(f"Reached max_results limit ({max_results})")
                     break
                 
@@ -813,12 +847,16 @@ class GoogleRankScraper:
             # Target not found in any pages
             if position is None:
                 logger.info(f"\n{'='*60}")
-                logger.info(f"✗ Not found in top {len(all_links)} results ({page_num} pages)")
+                logger.info(f"✗ Not found in top {len(all_results)} results ({page_num} pages)")
                 logger.info(f"{'='*60}")
-                if all_links:
-                    logger.info(f"First 10 results found:")
-                    for idx, link in enumerate(all_links[:10], 1):
+                logger.info(f"Target URL: {target_url}")
+                logger.info(f"Target normalized: {self._normalize_url(target_url)}")
+                
+                if all_results:
+                    logger.info(f"\nFirst 10 results found:")
+                    for idx, link in enumerate(all_results[:10], 1):
                         logger.info(f"  {idx}. {link}")
+                        logger.info(f"      Normalized: {self._normalize_url(link)}")
             
             return position
             
