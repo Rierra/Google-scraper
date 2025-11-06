@@ -38,10 +38,18 @@ class Database:
                     url TEXT NOT NULL,
                     country TEXT,
                     proxy TEXT,
+                    client_name TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     UNIQUE(keyword, url, country)
                 )
             ''')
+
+            # Add client_name column if it doesn't exist (for backward compatibility)
+            try:
+                cursor.execute("SELECT client_name FROM keywords LIMIT 1")
+            except sqlite3.OperationalError:
+                cursor.execute("ALTER TABLE keywords ADD COLUMN client_name TEXT")
+
             
             # Position history table
             cursor.execute('''
@@ -66,23 +74,24 @@ class Database:
             
             conn.commit()
     
-    def add_keyword(self, keyword, url, country=None, proxy=None):
+    def add_keyword(self, keyword, url, country=None, proxy=None, client_name=None):
         with self.get_conn() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    'INSERT INTO keywords (keyword, url, country, proxy) VALUES (?, ?, ?, ?)',
-                    (keyword, url, country, proxy)
+                    'INSERT INTO keywords (keyword, url, country, proxy, client_name) VALUES (?, ?, ?, ?, ?)',
+                    (keyword, url, country, proxy, client_name)
                 )
                 return cursor.lastrowid
             except sqlite3.IntegrityError:
                 return None  # Already exists
     
-    def get_all_keywords(self):
+    def get_all_keywords(self, client_name=None):
         with self.get_conn() as conn:
             cursor = conn.cursor()
-            cursor.execute('''
-                SELECT k.id, k.keyword, k.url, k.country, k.proxy, k.created_at,
+            
+            query = '''
+                SELECT k.id, k.keyword, k.url, k.country, k.proxy, k.client_name, k.created_at,
                        h.position, h.checked_at
                 FROM keywords k
                 LEFT JOIN (
@@ -90,8 +99,15 @@ class Database:
                            ROW_NUMBER() OVER (PARTITION BY keyword_id ORDER BY checked_at DESC) as rn
                     FROM position_history
                 ) h ON k.id = h.keyword_id AND h.rn = 1
-                ORDER BY k.id DESC
-            ''')
+            '''
+            params = []
+            if client_name:
+                query += " WHERE k.client_name = ?"
+                params.append(client_name)
+            
+            query += " ORDER BY k.id DESC"
+            
+            cursor.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
     
     def add_position_check(self, keyword_id, position):
@@ -116,11 +132,17 @@ class Database:
             cursor = conn.cursor()
             cursor.execute('DELETE FROM keywords WHERE id = ?', (keyword_id,))
 
-    def update_keyword(self, keyword_id, keyword, url, country=None, proxy=None):
+    def update_keyword(self, keyword_id, keyword, url, country=None, proxy=None, client_name=None):
         with self.get_conn() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                'UPDATE keywords SET keyword = ?, url = ?, country = ?, proxy = ? WHERE id = ?',
-                (keyword, url, country, proxy, keyword_id)
+                'UPDATE keywords SET keyword = ?, url = ?, country = ?, proxy = ?, client_name = ? WHERE id = ?',
+                (keyword, url, country, proxy, client_name, keyword_id)
             )
             return cursor.rowcount > 0 # Returns True if a row was updated
+
+    def get_all_client_names(self):
+        with self.get_conn() as conn:
+            cursor = conn.cursor()
+            cursor.execute('SELECT DISTINCT client_name FROM keywords WHERE client_name IS NOT NULL ORDER BY client_name')
+            return [row['client_name'] for row in cursor.fetchall()]

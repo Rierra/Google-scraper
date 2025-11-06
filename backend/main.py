@@ -74,6 +74,7 @@ class KeywordCreate(BaseModel):
     url: str
     country: Optional[str] = None
     proxy: Optional[str] = None
+    client_name: Optional[str] = None
 
 class KeywordResponse(BaseModel):
     id: int
@@ -81,6 +82,7 @@ class KeywordResponse(BaseModel):
     url: str
     country: Optional[str]
     proxy: Optional[str]
+    client_name: Optional[str]
     position: Optional[int]
     checked_at: Optional[str]
     created_at: str
@@ -162,7 +164,7 @@ async def login_for_access_token(form_data: LoginRequest):
 @app.post("/api/track")
 async def add_tracking(data: KeywordCreate, current_user: dict = Depends(get_current_user)):
     """Add new keyword to track"""
-    keyword_id = db.add_keyword(data.keyword, data.url, data.country, data.proxy)
+    keyword_id = db.add_keyword(data.keyword, data.url, data.country, data.proxy, data.client_name)
     if keyword_id is None:
         raise HTTPException(status_code=400, detail="Keyword with this URL and country is already being tracked")
     
@@ -171,16 +173,22 @@ async def add_tracking(data: KeywordCreate, current_user: dict = Depends(get_cur
 @app.put("/api/keyword/{keyword_id}")
 async def update_keyword(keyword_id: int, data: KeywordCreate, current_user: dict = Depends(get_current_user)):
     """Update an existing keyword"""
-    updated = db.update_keyword(keyword_id, data.keyword, data.url, data.country, data.proxy)
+    updated = db.update_keyword(keyword_id, data.keyword, data.url, data.country, data.proxy, data.client_name)
     if not updated:
         raise HTTPException(status_code=404, detail="Keyword not found")
     return {"message": "Keyword updated successfully"}
 
 @app.get("/api/keywords")
-async def get_keywords(current_user: dict = Depends(get_current_user)):
-    """Get all tracked keywords with latest position"""
-    keywords = db.get_all_keywords()
+async def get_keywords(client_name: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get all tracked keywords with latest position, optionally filtered by client_name"""
+    keywords = db.get_all_keywords(client_name=client_name)
     return {"keywords": keywords}
+
+@app.get("/api/client-names")
+async def get_client_names(current_user: dict = Depends(get_current_user)):
+    """Get all unique client names"""
+    client_names = db.get_all_client_names()
+    return {"client_names": client_names}
 
 # Global variable to store keywords that need processing
 pending_keywords = []

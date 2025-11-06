@@ -43,18 +43,23 @@ const RankTrackerDashboard = ({ token, setToken }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [checkingKeywords, setCheckingKeywords] = useState(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [clientNames, setClientNames] = useState([]);
+  const [selectedClient, setSelectedClient] = useState('');
   const [newTrack, setNewTrack] = useState({
     keyword: '',
     url: '',
     country: '',
-    proxy: ''
+    proxy: '',
+    client_name: ''
   });
   const [editingKeywordId, setEditingKeywordId] = useState(null);
   const [editedKeywordData, setEditedKeywordData] = useState({
     keyword: '',
     url: '',
     country: '',
-    proxy: ''
+    proxy: '',
+    client_name: ''
   });
   const navigate = useNavigate();
 
@@ -62,14 +67,28 @@ const RankTrackerDashboard = ({ token, setToken }) => {
   useEffect(() => {
     if (token) {
       fetchKeywords();
+      fetchClientNames();
     }
   }, [token]);
 
-  const fetchKeywords = async () => {
+  const fetchClientNames = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/api/client-names`);
+      setClientNames(response.data.client_names || []);
+    } catch (err) {
+      console.error('Error fetching client names:', err);
+    }
+  };
+
+  const fetchKeywords = async (clientName = selectedClient) => {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`${API_URL}/api/keywords`);
+      const params = {};
+      if (clientName) {
+        params.client_name = clientName;
+      }
+      const response = await axios.get(`${API_URL}/api/keywords`, { params });
       setKeywords(response.data.keywords || []);
     } catch (err) {
       if (err.response && err.response.status === 401) {
@@ -95,9 +114,10 @@ const RankTrackerDashboard = ({ token, setToken }) => {
     try {
       const response = await axios.post(`${API_URL}/api/track`, newTrack);
 
-      setNewTrack({ keyword: '', url: '', country: '', proxy: '' });
+      setNewTrack({ keyword: '', url: '', country: '', proxy: '', client_name: '' });
       setShowAddForm(false);
       await fetchKeywords();
+      await fetchClientNames(); // Refresh client names list
     } catch (err) {
       if (err.response && err.response.status === 401) {
         setToken(null);
@@ -206,7 +226,8 @@ const RankTrackerDashboard = ({ token, setToken }) => {
       keyword: keyword.keyword,
       url: keyword.url,
       country: keyword.country || '',
-      proxy: keyword.proxy || ''
+      proxy: keyword.proxy || '',
+      client_name: keyword.client_name || ''
     });
   };
 
@@ -216,7 +237,8 @@ const RankTrackerDashboard = ({ token, setToken }) => {
       keyword: '',
       url: '',
       country: '',
-      proxy: ''
+      proxy: '',
+      client_name: ''
     });
   };
 
@@ -231,6 +253,7 @@ const RankTrackerDashboard = ({ token, setToken }) => {
       await axios.put(`${API_URL}/api/keyword/${id}`, editedKeywordData);
       setEditingKeywordId(null);
       await fetchKeywords();
+      await fetchClientNames(); // Refresh client names list
     } catch (err) {
       if (err.response && err.response.status === 401) {
         setToken(null);
@@ -292,6 +315,10 @@ const RankTrackerDashboard = ({ token, setToken }) => {
     navigate('/login');
   };
 
+  const filteredKeywords = keywords.filter(k => 
+    k.keyword.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="min-h-screen bg-gray-900 p-3 sm:p-6">
       <div className="max-w-7xl mx-auto">
@@ -340,7 +367,38 @@ const RankTrackerDashboard = ({ token, setToken }) => {
               </button>
             </div>
             <div className="text-xs sm:text-sm text-gray-300 text-center sm:text-right">
-              Tracking {keywords.length} keyword{keywords.length !== 1 ? 's' : ''}
+              Tracking {filteredKeywords.length} keyword{filteredKeywords.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+        </div>
+
+        {/* Filter and Search Section */}
+        <div className="bg-gray-800 rounded-lg shadow-sm p-3 sm:p-4 mb-4 sm:mb-6 border border-gray-700">
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative w-full sm:w-1/2">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search keywords..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 text-sm sm:text-base"
+              />
+            </div>
+            <div className="relative w-full sm:w-1/2">
+              <select
+                value={selectedClient}
+                onChange={(e) => {
+                  setSelectedClient(e.target.value);
+                  fetchKeywords(e.target.value);
+                }}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 text-sm sm:text-base"
+              >
+                <option value="">All Clients</option>
+                {clientNames.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -370,6 +428,18 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                   value={newTrack.url}
                   onChange={(e) => setNewTrack({...newTrack, url: e.target.value})}
                   placeholder="https://example.com/your-page"
+                  className="w-full px-3 sm:px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 text-sm sm:text-base"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-1">
+                  Client Name (optional)
+                </label>
+                <input
+                  type="text"
+                  value={newTrack.client_name}
+                  onChange={(e) => setNewTrack({...newTrack, client_name: e.target.value})}
+                  placeholder="e.g., John Doe"
                   className="w-full px-3 sm:px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-gray-400 text-sm sm:text-base"
                 />
               </div>
@@ -442,7 +512,7 @@ const RankTrackerDashboard = ({ token, setToken }) => {
             <div className="block sm:hidden">
               {/* Mobile card view */}
               <div className="divide-y divide-gray-700">
-                {keywords.map((item) => (
+                {filteredKeywords.map((item) => (
                   <div key={item.id} className="p-4 hover:bg-gray-700/50 transition-colors">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -454,6 +524,9 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                           <span className="text-xs text-gray-400">
                             {getCountryName(item.country)}
                           </span>
+                          {item.client_name && (
+                            <span className="text-xs text-gray-500 ml-2">({item.client_name})</span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 ml-2">
@@ -519,6 +592,15 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                               type="url"
                               value={editedKeywordData.url}
                               onChange={(e) => setEditedKeywordData({...editedKeywordData, url: e.target.value})}
+                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-xs"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1">Client Name</label>
+                            <input
+                              type="text"
+                              value={editedKeywordData.client_name}
+                              onChange={(e) => setEditedKeywordData({...editedKeywordData, client_name: e.target.value})}
                               className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-xs"
                             />
                           </div>
@@ -598,6 +680,9 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                       URL
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Client Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                       Country
                     </th>
                     <th className="px-6 py-3 text-center text-xs font-medium text-gray-300 uppercase tracking-wider">
@@ -615,7 +700,7 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-700">
-                  {keywords.map((item) => (
+                  {filteredKeywords.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-700/50 transition-colors">
                       {editingKeywordId === item.id ? (
                         <>
@@ -632,6 +717,14 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                               type="url"
                               value={editedKeywordData.url}
                               onChange={(e) => setEditedKeywordData({...editedKeywordData, url: e.target.value})}
+                              className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-sm"
+                            />
+                          </td>
+                          <td className="px-6 py-4">
+                            <input
+                              type="text"
+                              value={editedKeywordData.client_name}
+                              onChange={(e) => setEditedKeywordData({...editedKeywordData, client_name: e.target.value})}
                               className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white text-sm"
                             />
                           </td>
@@ -707,6 +800,9 @@ const RankTrackerDashboard = ({ token, setToken }) => {
                             >
                               {item.url}
                             </a>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm text-gray-300">{item.client_name || 'N/A'}</span>
                           </td>
                           <td className="px-6 py-4">
                             <span className="text-sm text-gray-300">{getCountryName(item.country)}</span>
